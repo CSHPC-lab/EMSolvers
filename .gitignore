@@ -1,6 +1,4 @@
-# Prerequisites
-*.d
-
+# C++ Specific
 # Compiled Object files
 *.slo
 *.lo
@@ -16,10 +14,6 @@
 *.dylib
 *.dll
 
-# Fortran module files
-*.mod
-*.smod
-
 # Compiled Static libraries
 *.lai
 *.la
@@ -30,3 +24,48 @@
 *.exe
 *.out
 *.app
+
+# FDTD specific
+src/fdtd/fdtd_sim
+
+# FEM specific
+src/fem/fem_simulation
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+**/venv/
+**/.venv/
+**/.env
+**/.env.*
+**/ENV/
+
+# Visualization outputs (uncomment if you don't want to track these)
+# *.png
+# *.csv
+
+# IDE and editor files
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Project specific logs and temporary files
+*.log
+*.tmp
+
+**/*.csv
+**/*.png
