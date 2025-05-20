@@ -6,7 +6,7 @@ import glob
 
 def plot_time_series(filename):
     """
-    Plot time series data from a CSV file with 't' and 'Ez' columns.
+    Plot time series data from a CSV file with 'time' and 'Ex' columns.
     """
     # CSVファイルの読み込み
     try:
@@ -19,30 +19,30 @@ def plot_time_series(filename):
 
     # ヘッダー名のチェックと統一
     # tとEzの列名を確認し、必要に応じてリネーム
-    if 't' in df.columns and 'Ez' in df.columns:
-        time_col = 't'
-        ez_col = 'Ez'
-    elif 'time' in df.columns.str.lower() and 'ez' in df.columns.str.lower():
+    if 'time' in df.columns and 'Ex' in df.columns:
+        time_col = 'time'
+        ez_col = 'Ex'
+    elif 'time' in df.columns.str.lower() and 'Ex' in df.columns.str.lower():
         time_col = df.columns[df.columns.str.lower() == 'time'][0]
-        ez_col = df.columns[df.columns.str.lower() == 'ez'][0]
-        df = df.rename(columns={time_col: 't', ez_col: 'Ez'})
-        time_col = 't'
-        ez_col = 'Ez'
+        ez_col = df.columns[df.columns.str.lower() == 'Ex'][0]
+        df = df.rename(columns={time_col: 'time', ez_col: 'Ex'})
+        time_col = 'time'
+        ez_col = 'Ex'
     else:
         # 列が2つしかない場合は最初の列を時間、2番目を電界と仮定
         if len(df.columns) == 2:
-            df = df.rename(columns={df.columns[0]: 't', df.columns[1]: 'Ez'})
-            time_col = 't'
-            ez_col = 'Ez'
+            df = df.rename(columns={df.columns[0]: 'time', df.columns[1]: 'Ex'})
+            time_col = 'time'
+            ez_col = 'Ex'
             print(f"Assuming columns are time and Ez: {df.columns.tolist()}")
         else:
-            print(f"Expected columns 't' and 'Ez' not found.")
+            print(f"Expected columns 'time' and 'Ex' not found.")
             print(f"Available columns: {df.columns.tolist()}")
             return
 
     # 電界(Ez)の時系列プロット
     plt.figure(figsize=(12, 8))
-    plt.plot(df[time_col], df[ez_col], label='Ez', color='blue', linewidth=1.5)
+    plt.plot(df[time_col], df[ez_col], label='Ex', color='blue', linewidth=1.5)
     
     plt.xlabel('Time [s]')
     plt.ylabel('Electric Field Ez [V/m]')
@@ -77,15 +77,15 @@ def plot_spectrogram(filename):
         return
     
     # ヘッダー名のチェックと統一
-    if 't' in df.columns and 'Ez' in df.columns:
-        time_col = 't'
-        ez_col = 'Ez'
+    if 'time' in df.columns and 'Ex' in df.columns:
+        time_col = 'time'
+        ez_col = 'Ex'
     elif len(df.columns) == 2:
-        df = df.rename(columns={df.columns[0]: 't', df.columns[1]: 'Ez'})
-        time_col = 't'
-        ez_col = 'Ez'
+        df = df.rename(columns={df.columns[0]: 'time', df.columns[1]: 'Ex'})
+        time_col = 'time'
+        ez_col = 'Ex'
     else:
-        print(f"Expected columns 't' and 'Ez' not found.")
+        print(f"Expected columns 'time' and 'Ex' not found.")
         return
 
     # サンプリング周波数の計算
@@ -128,15 +128,15 @@ def plot_frequency_spectrum(filename):
         return
     
     # ヘッダー名のチェックと統一
-    if 't' in df.columns and 'Ez' in df.columns:
-        time_col = 't'
-        ez_col = 'Ez'
+    if 'time' in df.columns and 'Ex' in df.columns:
+        time_col = 'time'
+        ez_col = 'Ex'
     elif len(df.columns) == 2:
-        df = df.rename(columns={df.columns[0]: 't', df.columns[1]: 'Ez'})
-        time_col = 't'
-        ez_col = 'Ez'
+        df = df.rename(columns={df.columns[0]: 'time', df.columns[1]: 'Ex'})
+        time_col = 'time'
+        ez_col = 'Ex'
     else:
-        print(f"Expected columns 't' and 'Ez' not found.")
+        print(f"Expected columns 'time' and 'Ex' not found.")
         return
 
     # サンプリング周波数の計算
@@ -208,12 +208,12 @@ def plot_multiple_csv_files(directory='inputs'):
             df = pd.read_csv(file)
             
             # ヘッダー名のチェックと統一
-            if 't' in df.columns and 'Ez' in df.columns:
+            if 'time' in df.columns and 'Ex' in df.columns:
                 pass
             elif len(df.columns) == 2:
-                df = df.rename(columns={df.columns[0]: 't', df.columns[1]: 'Ez'})
+                df = df.rename(columns={df.columns[0]: 'time', df.columns[1]: 'Ex'})
             else:
-                print(f"Skipping {file}: Expected columns 't' and 'Ez' not found.")
+                print(f"Skipping {file}: Expected columns 'time' and 'Ex' not found.")
                 continue
             
             dataframes.append(df)
@@ -232,7 +232,7 @@ def plot_multiple_csv_files(directory='inputs'):
     colors = plt.cm.viridis(np.linspace(0, 1, len(dataframes)))
     
     for i, (df, name) in enumerate(zip(dataframes, file_names)):
-        plt.plot(df['t'], df['Ez'], label=name, color=colors[i], linewidth=1.5)
+        plt.plot(df['time'], df['Ex'], label=name, color=colors[i], linewidth=1.5)
     
     plt.xlabel('Time [s]')
     plt.ylabel('Electric Field Ez [V/m]')
@@ -253,13 +253,13 @@ def plot_multiple_csv_files(directory='inputs'):
     
     for i, (df, name) in enumerate(zip(dataframes, file_names)):
         # サンプリング周波数の計算
-        time_values = df['t'].values
+        time_values = df['time'].values
         if len(time_values) > 1:
             avg_dt = np.mean(np.diff(time_values))
             fs = 1.0 / avg_dt
             
             # 信号データ
-            signal = df['Ez'].values
+            signal = df['Ex'].values
             
             # FFTの実行
             n = len(signal)

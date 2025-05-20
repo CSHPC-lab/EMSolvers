@@ -1,5 +1,5 @@
-CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -fopenmp
+CXX = clang++
+CXXFLAGS = -std=c++17 -O3 -mp -acc -gpu=cc80 -gpu=managed -Minfo=accel -Minfo=mp
 LDFLAGS = 
 
 TARGET = fem_simulation
