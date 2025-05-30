@@ -34,9 +34,9 @@ int main()
 
     // シミュレーションパラメータの設定
     std::array<double, 3> domain_sizes = {5.0, 5.0, 5.0};         // 計算領域のサイズ [m]
-    std::array<int, 3> grid_num = {200, 200, 200};                // グリッド数
+    std::array<int, 3> grid_num = {800, 800, 800};                // グリッド数
     double duration = 5.0;                                        // シミュレーション時間 [s]
-    double time_step = 0.0015625;                                 // 時間ステップ [s]
+    double time_step = 0.0025;                                 // 時間ステップ [s]
     double relative_permittivity = 1.0;                           // 比誘電率
     double relative_permeability = 1.0;                           // 比透磁率
     std::array<double, 3> source_position = {2.0, 2.0, 2.0};      // 入力点の位置

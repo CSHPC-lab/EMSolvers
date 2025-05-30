@@ -54,15 +54,18 @@ void FemSimulation::initializeMesh()
 {
     int idx;
     int idx_element;
-    electric_field_x_.resize(
-        3 * grid_size_x_ * (grid_size_y_ + 1) * (grid_size_z_ + 1), 0.0);
-    electric_field_y_.resize(
-        3 * (grid_size_x_ + 1) * grid_size_y_ * (grid_size_z_ + 1), 0.0);
-    electric_field_z_.resize(
-        3 * (grid_size_x_ + 1) * (grid_size_y_ + 1) * grid_size_z_, 0.0);
-    connectivity_x_.resize(grid_size_x_ * grid_size_y_ * grid_size_z_ * 4, 0);
-    connectivity_y_.resize(grid_size_x_ * grid_size_y_ * grid_size_z_ * 4, 0);
-    connectivity_z_.resize(grid_size_x_ * grid_size_y_ * grid_size_z_ * 4, 0);
+
+    size_t total_size = 3ull * static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_ + 1);
+    electric_field_x_.resize(total_size, 0.0);
+    total_size = 3ull * static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1);
+    electric_field_y_.resize(total_size, 0.0);
+    total_size = 3ull * static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_);
+    electric_field_z_.resize(total_size, 0.0);
+    total_size = static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) * 4;
+    connectivity_x_.resize(total_size, 0);
+    connectivity_y_.resize(total_size, 0);
+    connectivity_z_.resize(total_size, 0);
+    
     electric_field_x_ptr_ = electric_field_x_.data();
     electric_field_y_ptr_ = electric_field_y_.data();
     electric_field_z_ptr_ = electric_field_z_.data();
