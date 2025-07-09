@@ -55,6 +55,10 @@ private:
     std::vector<double> electric_field_x_;
     std::vector<double> electric_field_y_;
     std::vector<double> electric_field_z_;
+    // 磁場の配列
+    std::vector<double> magnetic_field_x_;
+    std::vector<double> magnetic_field_y_;
+    std::vector<double> magnetic_field_z_;
 
     // コネクティビティ
     std::vector<int> connectivity_x_;
@@ -86,12 +90,15 @@ private:
     int ef_x_idx_0_;
     int ef_x_idx_1_;
     int ef_x_idx_2_;
+    int ef_x_idx_3_;
     int ef_y_idx_0_;
     int ef_y_idx_1_;
     int ef_y_idx_2_;
+    int ef_y_idx_3_;
     int ef_z_idx_0_;
     int ef_z_idx_1_;
     int ef_z_idx_2_;
+    int ef_z_idx_3_;
 
     // 要素剛性行列
     std::array<std::array<double, 12>, 12> element_stiffness_matrix_;

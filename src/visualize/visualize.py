@@ -4,66 +4,63 @@ import numpy as np
 import os
 import glob
 
-def plot_time_series(filename):
-    """
-    Plot time series data from a CSV file with 'time' and 'Ex' columns.
-    """
-    # CSVファイルの読み込み
-    try:
-        df = pd.read_csv(filename)
-        print(f"Loaded data from {filename}")
-        print(f"Columns: {df.columns.tolist()}")
-    except Exception as e:
-        print(f"Error loading file: {e}")
+def plot_multiple_csv_files(directory='inputs'):
+    if not os.path.exists(directory):
+        print(f"Directory {directory} does not exist.")
         return
 
-    # ヘッダー名のチェックと統一
-    # tとEzの列名を確認し、必要に応じてリネーム
-    if 'time' in df.columns and 'Ex' in df.columns:
-        time_col = 'time'
-        ez_col = 'Ex'
-    elif 'time' in df.columns.str.lower() and 'Ex' in df.columns.str.lower():
-        time_col = df.columns[df.columns.str.lower() == 'time'][0]
-        ez_col = df.columns[df.columns.str.lower() == 'Ex'][0]
-        df = df.rename(columns={time_col: 'time', ez_col: 'Ex'})
-        time_col = 'time'
-        ez_col = 'Ex'
-    else:
-        # 列が2つしかない場合は最初の列を時間、2番目を電界と仮定
-        if len(df.columns) == 2:
-            df = df.rename(columns={df.columns[0]: 'time', df.columns[1]: 'Ex'})
-            time_col = 'time'
-            ez_col = 'Ex'
-            print(f"Assuming columns are time and Ez: {df.columns.tolist()}")
-        else:
-            print(f"Expected columns 'time' and 'Ex' not found.")
-            print(f"Available columns: {df.columns.tolist()}")
-            return
+    csv_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.csv')]
+    if not csv_files:
+        print(f"No CSV files found in {directory}")
+        return
 
-    # 電界(Ez)の時系列プロット
-    plt.figure(figsize=(12, 8))
-    plt.plot(df[time_col], df[ez_col], label='Ex', color='blue', linewidth=1.5)
-    
-    plt.xlabel('Time [s]')
-    plt.ylabel('Electric Field Ez [V/m]')
-    plt.title('Electric Field (Ez) Time Series')
-    plt.legend()
-    plt.grid(True)
-    
-    # グラフの保存
-    output_filename = 'electric_field_time_series.png'
-    plt.savefig(output_filename)
-    print(f"Saved plot to {output_filename}")
-    
-    # 科学的表記のx軸ラベルを設定
-    plt.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
-    
-    # 視覚的な改善を適用
-    plt.tight_layout()
-    
-    # インタラクティブモードでの表示 (オプション)
+    dataframes = []
+    file_names = []
+
+    for file in csv_files:
+        try:
+            df = pd.read_csv(file)
+            if 'time' not in df.columns:
+                print(f"Skipping {file}: 'time' column not found.")
+                continue
+            dataframes.append(df)
+            file_names.append(os.path.basename(file))
+        except Exception as e:
+            print(f"Error loading {file}: {e}")
+
+    if not dataframes:
+        print("No valid CSV files were loaded.")
+        return
+
+    field_cols = ['Ex', 'Ey', 'Ez']
+    existing_fields = [col for col in field_cols if any(col in df.columns for df in dataframes)]
+
+    fig, axes = plt.subplots(len(existing_fields), 1, figsize=(12, 3 * len(existing_fields)), sharex=True)
+    if len(existing_fields) == 1:
+        axes = [axes]
+
+    colors = plt.cm.viridis(np.linspace(0, 1, len(dataframes)))
+
+    for i, field in enumerate(existing_fields):
+        ax = axes[i]
+        for j, (df, name) in enumerate(zip(dataframes, file_names)):
+            if field in df.columns:
+                ax.plot(df['time'], df[field], label=name, color=colors[j], linewidth=1.5)
+        ax.set_ylabel(f"{field} [V/m]")
+        ax.set_title(f"{field} Time Series")
+        ax.grid(True)
+        ax.ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
+        ax.legend(fontsize='small', loc='upper right')
+
+    axes[-1].set_xlabel('Time [s]')
+    # fig.suptitle('Comparison of Electric Field Components', fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.savefig('comparison_time_series_xyz.png')
+    print("Saved: comparison_time_series_xyz.png")
     plt.show()
     plt.close()
+
+
 
 def plot_spectrogram(filename):
     """
@@ -79,11 +76,11 @@ def plot_spectrogram(filename):
     # ヘッダー名のチェックと統一
     if 'time' in df.columns and 'Ex' in df.columns:
         time_col = 'time'
-        ez_col = 'Ex'
+        ex_col = 'Ex'
     elif len(df.columns) == 2:
         df = df.rename(columns={df.columns[0]: 'time', df.columns[1]: 'Ex'})
         time_col = 'time'
-        ez_col = 'Ex'
+        ex_col = 'Ex'
     else:
         print(f"Expected columns 'time' and 'Ex' not found.")
         return
@@ -100,11 +97,11 @@ def plot_spectrogram(filename):
     
     # スペクトログラムの作成
     plt.figure(figsize=(12, 8))
-    plt.specgram(df[ez_col].values, Fs=fs, cmap='viridis')
+    plt.specgram(df[ex_col].values, Fs=fs, cmap='viridis')
     
     plt.xlabel('Time [s]')
     plt.ylabel('Frequency [Hz]')
-    plt.title('Spectrogram of Electric Field (Ez)')
+    plt.title('Spectrogram of Electric Field (Ex)')
     plt.colorbar(label='Intensity [dB]')
     
     # グラフの保存
@@ -130,11 +127,11 @@ def plot_frequency_spectrum(filename):
     # ヘッダー名のチェックと統一
     if 'time' in df.columns and 'Ex' in df.columns:
         time_col = 'time'
-        ez_col = 'Ex'
+        ex_col = 'Ex'
     elif len(df.columns) == 2:
         df = df.rename(columns={df.columns[0]: 'time', df.columns[1]: 'Ex'})
         time_col = 'time'
-        ez_col = 'Ex'
+        ex_col = 'Ex'
     else:
         print(f"Expected columns 'time' and 'Ex' not found.")
         return
@@ -150,7 +147,7 @@ def plot_frequency_spectrum(filename):
         return
     
     # 信号データ
-    signal = df[ez_col].values
+    signal = df[ex_col].values
     
     # FFTの実行
     n = len(signal)
@@ -165,7 +162,7 @@ def plot_frequency_spectrum(filename):
     
     plt.xlabel('Frequency [Hz]')
     plt.ylabel('Amplitude')
-    plt.title('Frequency Spectrum of Electric Field (Ez)')
+    plt.title('Frequency Spectrum of Electric Field (Ex)')
     plt.grid(True)
     
     # 対数スケールのオプション
@@ -180,109 +177,6 @@ def plot_frequency_spectrum(filename):
     plt.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
     plt.tight_layout()
     plt.show()
-    plt.close()
-
-def plot_multiple_csv_files(directory='inputs'):
-    """
-    Plot multiple CSV files on the same graph for comparison.
-    """
-    # CSVファイルを検索
-    if not os.path.exists(directory):
-        print(f"Directory {directory} does not exist.")
-        return
-    
-    csv_files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.csv')]
-    
-    if not csv_files:
-        print(f"No CSV files found in {directory}")
-        return
-    
-    print(f"Found {len(csv_files)} CSV files in {directory}: {[os.path.basename(f) for f in csv_files]}")
-    
-    # 全ファイルのデータをロード
-    dataframes = []
-    file_names = []
-    
-    for file in csv_files:
-        try:
-            df = pd.read_csv(file)
-            
-            # ヘッダー名のチェックと統一
-            if 'time' in df.columns and 'Ex' in df.columns:
-                pass
-            elif len(df.columns) == 2:
-                df = df.rename(columns={df.columns[0]: 'time', df.columns[1]: 'Ex'})
-            else:
-                print(f"Skipping {file}: Expected columns 'time' and 'Ex' not found.")
-                continue
-            
-            dataframes.append(df)
-            file_names.append(os.path.basename(file))
-            print(f"Loaded {os.path.basename(file)}")
-        except Exception as e:
-            print(f"Error loading {file}: {e}")
-    
-    if not dataframes:
-        print("No valid CSV files were loaded.")
-        return
-    
-    # 時系列の比較プロット
-    plt.figure(figsize=(14, 10))
-    
-    colors = plt.cm.viridis(np.linspace(0, 1, len(dataframes)))
-    
-    for i, (df, name) in enumerate(zip(dataframes, file_names)):
-        plt.plot(df['time'], df['Ex'], label=name, color=colors[i], linewidth=1.5)
-    
-    plt.xlabel('Time [s]')
-    plt.ylabel('Electric Field Ez [V/m]')
-    plt.title('Comparison of Electric Field (Ez) Time Series')
-    plt.legend()
-    plt.grid(True)
-    plt.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
-    plt.tight_layout()
-    
-    # グラフの保存
-    output_filename = 'comparison_time_series.png'
-    plt.savefig(output_filename)
-    print(f"Saved comparison plot to {output_filename}")
-    plt.close()
-    
-    # 周波数スペクトルの比較
-    plt.figure(figsize=(14, 10))
-    
-    for i, (df, name) in enumerate(zip(dataframes, file_names)):
-        # サンプリング周波数の計算
-        time_values = df['time'].values
-        if len(time_values) > 1:
-            avg_dt = np.mean(np.diff(time_values))
-            fs = 1.0 / avg_dt
-            
-            # 信号データ
-            signal = df['Ex'].values
-            
-            # FFTの実行
-            n = len(signal)
-            yf = np.fft.fft(signal)
-            xf = np.fft.fftfreq(n, avg_dt)
-            
-            # 正の周波数のみプロット
-            positive_freq_idx = xf > 0
-            plt.plot(xf[positive_freq_idx], 2.0/n * np.abs(yf[positive_freq_idx]), 
-                    label=name, color=colors[i], linewidth=1.5)
-    
-    plt.xlabel('Frequency [Hz]')
-    plt.ylabel('Amplitude')
-    plt.title('Comparison of Frequency Spectra')
-    plt.legend()
-    plt.grid(True)
-    plt.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
-    plt.tight_layout()
-    
-    # グラフの保存
-    output_filename = 'comparison_spectrum.png'
-    plt.savefig(output_filename)
-    print(f"Saved frequency spectrum comparison to {output_filename}")
     plt.close()
 
 def process_csv_file(filename):

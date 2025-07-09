@@ -1,42 +1,85 @@
 #pragma once
-#include <vector>
+
+#include <array>
+#include <functional>
+#include <memory>
 #include <string>
-#include <iostream>
+#include <vector>
 
-constexpr double EPSILON_0 = 8.854187817e-12;
-constexpr double MU_0 = 1.2566370614e-6;
-
-struct Parameters {
-    double dx, dy, dz;
-    int nx, ny, nz;
-    double dt;
-    int nt;
-
-    int src_i, src_j, src_k;
-    int obs_i, obs_j, obs_k;
-
-    double f_peak; // ピーク周波数（Hz）
-    double t0;     // 中心時間（秒）
-
-    double rel_eps; // 比誘電率
-    double rel_mu;  // 比透磁率
-};
-
-class FDTD {
+class FemSimulation
+{
 public:
-    FDTD(const Parameters& params);
-    void run();
-private:
-    Parameters p;
-    std::vector<std::vector<std::vector<double>>> Ex, Ey, Ez;
-    std::vector<std::vector<std::vector<double>>> Hx, Hy, Hz;
-    std::vector<double> observation;
+    // コンストラクタ
+    FemSimulation(const std::array<int, 3> &grid_size, double domain_size, double time_step,
+                  double permittivity, double permeability, int time_frequency);
 
-    void initialize_fields();
-    void update_H();
-    void update_E();
-    void apply_source(int t);
-    void record_observation();
-    void output_observation_csv(const std::string& filename);
-    void check_cfl_condition();
+    // シミュレーションの実行
+    void run(int num_steps);
+
+    // 外力の設定
+    void setSource_x(const std::array<int, 3> &position);
+    void setSource_y(const std::array<int, 3> &position);
+    void setSource_z(const std::array<int, 3> &position);
+
+    // 観測点の設定
+    void setObservationPoint(const std::array<std::vector<std::array<int, 3>>, 3> &position);
+
+    // 結果の保存
+    void saveResults(int num_steps, double c);
+
+private:
+    // メッシュの初期化
+    void initializeMesh();
+
+    // 時間ステップの更新
+    void updateTimeStep();
+
+    // メンバ変数
+    int grid_size_x_;
+    int grid_size_y_;
+    int grid_size_z_;
+    double domain_size_;
+    double time_step_;
+    double permittivity_;
+    double permeability_;
+    int time_frequency_;
+    // 電場の配列
+    std::vector<double> electric_field_x_;
+    std::vector<double> electric_field_y_;
+    std::vector<double> electric_field_z_;
+
+    // 磁場の配列
+    std::vector<double> magnetic_field_x_;
+    std::vector<double> magnetic_field_y_;
+    std::vector<double> magnetic_field_z_;
+
+    // 外力の情報
+    std::vector<int> source_position_x_;
+    std::vector<int> source_position_y_;
+    std::vector<int> source_position_z_;
+
+    // 観測点のリスト
+    std::vector<std::array<std::vector<std::array<int, 3>>, 3>> observation_points_;
+
+    // 時間
+    double current_time_;
+
+    // 時間ステップに対応するインデックス
+    int ef_x_idx_0_;
+    int ef_y_idx_0_;
+    int ef_z_idx_0_;
+    int hf_x_idx_0_;
+    int hf_y_idx_0_;
+    int hf_z_idx_0_;
+
+    // 要素剛性行列
+    std::array<std::array<double, 12>, 12> element_stiffness_matrix_;
+
+    // 保存する時系列計算結果
+    std::vector<std::vector<std::array<double, 3>>> saved_electric_field_;
 };
+
+bool check_params(const std::array<double, 3> &domain_sizes, const std::array<int, 3> &grid_num, double duration,
+                  double time_step, double domain_size, double c);
+
+double source_function(double t);

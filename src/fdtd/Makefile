@@ -1,18 +1,20 @@
-CXX = g++
-CXXFLAGS = -std=c++17 -O2
-TARGET = fdtd_sim
-OBJS = main.o fdtd_simulation.o
+CXX = clang++
+CXXFLAGS = -std=c++17 -O3 -mp -acc -gpu=cc80 -gpu=managed -Minfo=accel -Minfo=mp
+LDFLAGS = 
+
+TARGET = simulation.o
+SRCS = main.cpp fdtd_simulation.cpp
+OBJS = $(SRCS:.cpp=.o)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
-main.o: main.cpp fdtd_simulation.hpp
-	$(CXX) $(CXXFLAGS) -c main.cpp
-
-fdtd_simulation.o: fdtd_simulation.cpp fdtd_simulation.hpp
-	$(CXX) $(CXXFLAGS) -c fdtd_simulation.cpp
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(TARGET) *.o observation.csv
+	rm -f $(OBJS) $(TARGET)
+
+.PHONY: all clean 
