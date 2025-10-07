@@ -1,8 +1,8 @@
-CXX = clang++
+CXX = nvc++
 CXXFLAGS = -std=c++17 -O3 -mp -acc -gpu=cc80 -gpu=managed -Minfo=accel -Minfo=mp -I/home/kusumoto/include/Eigen
-LDFLAGS = 
+LDFLAGS =
 
-TARGET = simulation.o
+TARGET ?= simulation.o
 SRCS = main.cpp fem_simulation.cpp
 OBJS = $(SRCS:.cpp=.o)
 
@@ -15,6 +15,4 @@ $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJS) $(TARGET)
-
-.PHONY: all clean 
+	rm -f $(TARGET)

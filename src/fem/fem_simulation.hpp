@@ -11,7 +11,8 @@ class FemSimulation
 public:
     // コンストラクタ
     FemSimulation(const std::array<int, 3> &grid_size, double domain_size, double time_step,
-                  double permittivity, double permeability, int time_frequency);
+                  double permittivity, double permeability, int time_frequency,
+                  double stabilization_factor, int use_ofem);
 
     // シミュレーションの実行
     void run(int num_steps);
@@ -30,7 +31,7 @@ public:
     void setObservationPoint(const std::array<std::vector<std::array<int, 3>>, 3> &position);
 
     // 結果の保存
-    void saveResults(int num_steps);
+    void saveResults(int num_steps, const std::string &filename);
 
 private:
     // メッシュの初期化
@@ -51,6 +52,8 @@ private:
     double permittivity_;
     double permeability_;
     int time_frequency_;
+    double stabilization_factor_;
+    int use_ofem_;
     // 電場の配列
     std::vector<double> electric_field_x_;
     std::vector<double> electric_field_y_;

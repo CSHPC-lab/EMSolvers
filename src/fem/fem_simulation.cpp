@@ -20,13 +20,10 @@ int *source_position_z_ptr_;
 std::array<int, 3> *source_dipole_position_x_ptr_;
 std::array<int, 3> *source_dipole_position_y_ptr_;
 std::array<int, 3> *source_dipole_position_z_ptr_;
-std::array<double, 12> electric_field_0;
-std::array<std::array<double, 4>, 4> Kmat00;
-std::array<std::array<double, 4>, 4> Kmat01;
-std::array<std::array<double, 4>, 4> Kmat02;
-
-double stabilization_factor = 0.1; // 安定化係数
-bool use_ofem = true;              // OFEMを使用するかどうか
+std::array<double, 12> electric_field_0_;
+std::array<std::array<double, 4>, 4> Kmat00_;
+std::array<std::array<double, 4>, 4> Kmat01_;
+std::array<std::array<double, 4>, 4> Kmat02_;
 
 #pragma acc routine seq
 double source_function(double t, double permeability, double domain_size)
@@ -43,7 +40,7 @@ double source_function(double t, double permeability, double domain_size)
 
 FemSimulation::FemSimulation(const std::array<int, 3> &grid_size, double domain_size,
                              double time_step, double permittivity, double permeability,
-                             int time_frequency)
+                             int time_frequency, double stabilization_factor, int use_ofem)
     : grid_size_x_(grid_size[0]),
       grid_size_y_(grid_size[1]),
       grid_size_z_(grid_size[2]),
@@ -55,9 +52,11 @@ FemSimulation::FemSimulation(const std::array<int, 3> &grid_size, double domain_
       current_time_(0.0),
       time_0_(0),
       time_1_(1),
-      time_2_(2)
+      time_2_(2),
+      stabilization_factor_(stabilization_factor),
+      use_ofem_(use_ofem)
 {
-#pragma acc data create(electric_field_0[0 : 12])
+#pragma acc data create(electric_field_0_[0 : 12])
     initializeMesh();
     calculateElementStiffnessMatrix();
 }
@@ -96,7 +95,6 @@ void FemSimulation::initializeMesh()
 #pragma acc data copyin(connectivity_x_ptr_[0 : CNx])
 #pragma acc data copyin(connectivity_y_ptr_[0 : CNy])
 #pragma acc data copyin(connectivity_z_ptr_[0 : CNz])
-#pragma acc data copyin(stabilization_factor)
 #pragma acc parallel loop collapse(3) private(idx, idx_element)
     for (int k = 0; k < grid_size_z_; ++k)
     {
@@ -129,7 +127,7 @@ void FemSimulation::calculateElementStiffnessMatrix()
     Eigen::MatrixXd Amat_true(12, 12);
     Eigen::MatrixXd Bmat_true(12, 12);
     Eigen::MatrixXd Cmat_true(12, 12);
-    if (!use_ofem)
+    if (!use_ofem_)
     {
         // 要素剛性行列の計算(従来法)
         std::array<std::array<double, 12>, 12> Amat = {
@@ -174,7 +172,7 @@ void FemSimulation::calculateElementStiffnessMatrix()
                 _Amat_Eigen(i, j) = _Amat[i][j];
             }
         }
-        Amat_true = Amat_Eigen + stabilization_factor * _Amat_Eigen;
+        Amat_true = Amat_Eigen + stabilization_factor_ * _Amat_Eigen;
         std::array<std::array<double, 12>, 12> Bmat = {
             {{8.0 / 9.0, 4.0 / 9.0, 4.0 / 9.0, 2.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0},
              {4.0 / 9.0, 8.0 / 9.0, 2.0 / 9.0, 4.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0},
@@ -217,7 +215,7 @@ void FemSimulation::calculateElementStiffnessMatrix()
                 _Bmat_Eigen(i, j) = _Bmat[i][j];
             }
         }
-        Bmat_true = Bmat_Eigen + stabilization_factor * _Bmat_Eigen;
+        Bmat_true = Bmat_Eigen + stabilization_factor_ * _Bmat_Eigen;
         std::array<std::array<double, 12>, 12> Cmat = {
             {{0.0, 0.0, 0.0, 0.0, -0.5, -0.5, -0.5, -0.5, 0.5, 0.5, 0.5, 0.5},
              {0.0, 0.0, 0.0, 0.0, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5},
@@ -260,10 +258,9 @@ void FemSimulation::calculateElementStiffnessMatrix()
                 _Cmat_Eigen(i, j) = _Cmat[i][j];
             }
         }
-        Cmat_true = Cmat_Eigen + stabilization_factor * _Cmat_Eigen;
+        Cmat_true = Cmat_Eigen + stabilization_factor_ * _Cmat_Eigen;
     }
-
-    if (use_ofem)
+    else
     {
         // 要素剛性行列の計算(直交不連続基底)
         std::array<std::array<double, 12>, 12> Amat = {
@@ -308,7 +305,7 @@ void FemSimulation::calculateElementStiffnessMatrix()
                 _Amat_Eigen(i, j) = _Amat[i][j];
             }
         }
-        Amat_true = Amat_Eigen + stabilization_factor * _Amat_Eigen;
+        Amat_true = Amat_Eigen + stabilization_factor_ * _Amat_Eigen;
         std::array<std::array<double, 12>, 12> Bmat = {
             {{72.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0},
              {0.0 / 9.0, 24.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0, 0.0 / 9.0},
@@ -351,7 +348,7 @@ void FemSimulation::calculateElementStiffnessMatrix()
                 _Bmat_Eigen(i, j) = _Bmat[i][j];
             }
         }
-        Bmat_true = Bmat_Eigen + stabilization_factor * _Bmat_Eigen;
+        Bmat_true = Bmat_Eigen + stabilization_factor_ * _Bmat_Eigen;
         std::array<std::array<double, 12>, 12> Cmat = {
             {{0.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, -6.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, 6.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0},
              {0.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, -6.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, -6.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0, 0.0 / 3.0},
@@ -407,7 +404,7 @@ void FemSimulation::calculateElementStiffnessMatrix()
                 _Cmat_Eigen(i, j) = _Cmat[i][j];
             }
         }
-        Cmat_true = Cmat_Eigen + stabilization_factor * _Cmat_Eigen;
+        Cmat_true = Cmat_Eigen + stabilization_factor_ * _Cmat_Eigen;
     }
 
     Eigen::MatrixXd Kmat_Eigen(12, 12);
@@ -426,14 +423,14 @@ void FemSimulation::calculateElementStiffnessMatrix()
     {
         for (int j = 0; j < 4; ++j)
         {
-            Kmat00[i][j] = element_stiffness_matrix_[i][j];
-            Kmat01[i][j] = element_stiffness_matrix_[i][j + 4];
-            Kmat02[i][j] = element_stiffness_matrix_[i][j + 8];
+            Kmat00_[i][j] = element_stiffness_matrix_[i][j];
+            Kmat01_[i][j] = element_stiffness_matrix_[i][j + 4];
+            Kmat02_[i][j] = element_stiffness_matrix_[i][j + 8];
         }
     }
     std::cerr << "----------------------------------------" << std::endl;
     std::cerr << "Element stiffness matrix set." << std::endl;
-#pragma acc data copyin(Kmat00, Kmat01, Kmat02, element_stiffness_matrix_)
+#pragma acc data copyin(Kmat00_, Kmat01_, Kmat02_, element_stiffness_matrix_)
 }
 
 void FemSimulation::setSource_x(const std::array<int, 3> &position)
@@ -498,7 +495,7 @@ void FemSimulation::updateTimeStep()
     int l, m, n, n_x, n_y, n_z;
     int conn_0, conn_1, conn_2, conn_3;
 
-#pragma acc parallel loop private(idx, electric_field_0, temp, temp_x, temp_y, temp_z, l, m, n, n_x, n_y, n_z) collapse(3)
+#pragma acc parallel loop private(idx, electric_field_0_, temp, temp_x, temp_y, temp_z, l, m, n, n_x, n_y, n_z) collapse(3)
     for (int k = 0; k < grid_size_z_; ++k)
     {
         for (int j = 0; j < grid_size_y_; ++j)
@@ -506,7 +503,7 @@ void FemSimulation::updateTimeStep()
             for (int i = 0; i < grid_size_x_; ++i)
             {
                 idx = (i + j * grid_size_x_ + k * grid_size_x_ * grid_size_y_) * 4;
-                electric_field_0 = {
+                electric_field_0_ = {
                     electric_field_x_ptr_[ef_x_idx_1_ + connectivity_x_ptr_[idx + 0]],
                     electric_field_x_ptr_[ef_x_idx_1_ + connectivity_x_ptr_[idx + 1]],
                     electric_field_x_ptr_[ef_x_idx_1_ + connectivity_x_ptr_[idx + 2]],
@@ -528,7 +525,7 @@ void FemSimulation::updateTimeStep()
 #pragma acc loop seq
                     for (m = 0; m < 12; ++m)
                     {
-                        temp += element_stiffness_matrix_[l][m] * electric_field_0[m];
+                        temp += element_stiffness_matrix_[l][m] * electric_field_0_[m];
                     }
                     n = ef_x_idx_2_ + connectivity_x_ptr_[idx + l];
 #pragma acc atomic update
@@ -542,7 +539,7 @@ void FemSimulation::updateTimeStep()
 #pragma acc loop seq
                     for (m = 0; m < 12; ++m)
                     {
-                        temp += element_stiffness_matrix_[l][m] * electric_field_0[m];
+                        temp += element_stiffness_matrix_[l][m] * electric_field_0_[m];
                     }
                     n = ef_y_idx_2_ + connectivity_y_ptr_[idx + l - 4];
 #pragma acc atomic update
@@ -556,7 +553,7 @@ void FemSimulation::updateTimeStep()
 #pragma acc loop seq
                     for (m = 0; m < 12; ++m)
                     {
-                        temp += element_stiffness_matrix_[l][m] * electric_field_0[m];
+                        temp += element_stiffness_matrix_[l][m] * electric_field_0_[m];
                     }
                     n = ef_z_idx_2_ + connectivity_z_ptr_[idx + l - 8];
 #pragma acc atomic update
@@ -575,15 +572,15 @@ void FemSimulation::updateTimeStep()
                 // #pragma acc loop seq
                 //                     for (m = 0; m < 4; ++m)
                 //                     {
-                //                         temp_x += Kmat00[l][m] * electric_field_0[m] +
-                //                                   Kmat01[l][m] * electric_field_0[m + 4] +
-                //                                   Kmat02[l][m] * electric_field_0[m + 8];
-                //                         temp_y += Kmat02[l][m] * electric_field_0[m] +
-                //                                   Kmat00[l][m] * electric_field_0[m + 4] +
-                //                                   Kmat01[l][m] * electric_field_0[m + 8];
-                //                         temp_z += Kmat01[l][m] * electric_field_0[m] +
-                //                                   Kmat02[l][m] * electric_field_0[m + 4] +
-                //                                   Kmat00[l][m] * electric_field_0[m + 8];
+                //                         temp_x += Kmat00_[l][m] * electric_field_0_[m] +
+                //                                   Kmat01_[l][m] * electric_field_0_[m + 4] +
+                //                                   Kmat02_[l][m] * electric_field_0_[m + 8];
+                //                         temp_y += Kmat02_[l][m] * electric_field_0_[m] +
+                //                                   Kmat00_[l][m] * electric_field_0_[m + 4] +
+                //                                   Kmat01_[l][m] * electric_field_0_[m + 8];
+                //                         temp_z += Kmat01_[l][m] * electric_field_0_[m] +
+                //                                   Kmat02_[l][m] * electric_field_0_[m + 4] +
+                //                                   Kmat00_[l][m] * electric_field_0_[m + 8];
                 //                     }
                 // #pragma acc atomic update
                 //                     electric_field_x_ptr_[n_x] -= temp_x;
@@ -637,7 +634,7 @@ void FemSimulation::updateTimeStep()
             time_step_ / permeability_ / permittivity_ / domain_size_ / domain_size_ / domain_size_;
     }
     // 外力項の計算(ヘルツダイポール)
-    if (!use_ofem)
+    if (!use_ofem_)
     {
 #pragma acc parallel loop private(conn_0, conn_1, conn_2, conn_3, temp)
         for (size_t i = 0; i < source_dipole_position_x_.size(); ++i)
@@ -680,40 +677,40 @@ void FemSimulation::updateTimeStep()
             electric_field_x_ptr_[ef_x_idx_2_ + connectivity_x_ptr_[conn_3 + 3]] +=
                 1.0 / 8.0 * temp;
             electric_field_y_ptr_[ef_y_idx_2_ + connectivity_y_ptr_[conn_0]] +=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_y_ptr_[ef_y_idx_2_ + connectivity_y_ptr_[conn_0 + 2]] +=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_y_ptr_[ef_y_idx_2_ + connectivity_y_ptr_[conn_1]] +=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_y_ptr_[ef_y_idx_2_ + connectivity_y_ptr_[conn_1 + 2]] +=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_y_ptr_[ef_y_idx_2_ + connectivity_y_ptr_[conn_2 + 1]] -=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_y_ptr_[ef_y_idx_2_ + connectivity_y_ptr_[conn_2 + 3]] -=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_y_ptr_[ef_y_idx_2_ + connectivity_y_ptr_[conn_3 + 1]] -=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_y_ptr_[ef_y_idx_2_ + connectivity_y_ptr_[conn_3 + 3]] -=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_z_ptr_[ef_z_idx_2_ + connectivity_z_ptr_[conn_0]] -=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_z_ptr_[ef_z_idx_2_ + connectivity_z_ptr_[conn_0 + 1]] -=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_z_ptr_[ef_z_idx_2_ + connectivity_z_ptr_[conn_1 + 2]] +=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_z_ptr_[ef_z_idx_2_ + connectivity_z_ptr_[conn_1 + 3]] +=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_z_ptr_[ef_z_idx_2_ + connectivity_z_ptr_[conn_2]] -=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_z_ptr_[ef_z_idx_2_ + connectivity_z_ptr_[conn_2 + 1]] -=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_z_ptr_[ef_z_idx_2_ + connectivity_z_ptr_[conn_3 + 2]] +=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
             electric_field_z_ptr_[ef_z_idx_2_ + connectivity_z_ptr_[conn_3 + 3]] +=
-                stabilization_factor / 2.0 * temp;
+                stabilization_factor_ / 2.0 * temp;
         }
     }
-    if (use_ofem)
+    else
     {
 #pragma acc parallel loop private(conn_0, conn_1, conn_2, conn_3, temp)
         for (size_t i = 0; i < source_dipole_position_x_.size(); ++i)
@@ -911,16 +908,14 @@ void FemSimulation::run(int num_steps)
     }
 }
 
-void FemSimulation::saveResults(int num_steps)
+void FemSimulation::saveResults(int num_steps, const std::string &filename)
 {
     for (size_t i = 0; i < saved_electric_field_.size(); ++i)
     {
-        std::string filename_i = "results_" + std::to_string(i) + "_" + std::to_string(time_step_) + "_" + std::to_string(domain_size_) + "_" +
-                                 std::to_string(num_steps) + ".csv";
-        std::ofstream file(filename_i);
+        std::ofstream file(filename);
         if (!file.is_open())
         {
-            std::cerr << "Error: Could not open file " << filename_i << std::endl;
+            std::cerr << "Error: Could not open file " << filename << std::endl;
             return;
         }
 
