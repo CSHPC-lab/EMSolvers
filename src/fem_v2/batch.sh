@@ -2,8 +2,8 @@
 
 #SBATCH --array=2-2%1
 #SBATCH --cpus-per-task=12
-#SBATCH --gres=gpu:1
-#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:2
+#SBATCH --ntasks-per-node=2
 #SBATCH --nodes=1
 #SBATCH --partition=80g
 #SBATCH --time=24:00:00
@@ -15,10 +15,10 @@ module load nvhpc
 use_ofem="1"
 domain_size="1.0"
 duration="3.0e-9"
-source_position="0.49"
-observation_position="0.51"
+source_position="0.48"
+observation_position="0.50"
 target="simulation_${SLURM_ARRAY_TASK_ID}_${use_ofem}_${domain_size}_${duration}_${source_position}_${observation_position}.o"
-dim_x=1
+dim_x=2
 dim_y=1
 dim_z=1
 

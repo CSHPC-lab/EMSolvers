@@ -648,10 +648,16 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_x_plane_0_y_ptr_, send_buf_x_plane_1_y_ptr_, recv_buf_x_plane_0_y_ptr_, recv_buf_x_plane_1_y_ptr_)
     {
-        MPI_Allreduce(send_buf_x_plane_0_y_ptr_, recv_buf_x_plane_0_y_ptr_,
-                      BNx0y, MPI_DOUBLE, MPI_SUM, comm_0_);
-        MPI_Allreduce(send_buf_x_plane_1_y_ptr_, recv_buf_x_plane_1_y_ptr_,
-                      BNx1y, MPI_DOUBLE, MPI_SUM, comm_1_);
+        if (comm_0_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_x_plane_0_y_ptr_, recv_buf_x_plane_0_y_ptr_,
+                        BNx0y, MPI_DOUBLE, MPI_SUM, comm_0_);
+        }
+        if (comm_1_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_x_plane_1_y_ptr_, recv_buf_x_plane_1_y_ptr_,
+                        BNx1y, MPI_DOUBLE, MPI_SUM, comm_1_);
+        }
     }
 #pragma acc parallel loop collapse(2)
     for (int i = 0; i < grid_size_y_; ++i)
@@ -677,10 +683,16 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_x_plane_0_z_ptr_, send_buf_x_plane_1_z_ptr_, recv_buf_x_plane_0_z_ptr_, recv_buf_x_plane_1_z_ptr_)
     {
-        MPI_Allreduce(send_buf_x_plane_0_z_ptr_, recv_buf_x_plane_0_z_ptr_,
-                      BNx0z, MPI_DOUBLE, MPI_SUM, comm_0_);
-        MPI_Allreduce(send_buf_x_plane_1_z_ptr_, recv_buf_x_plane_1_z_ptr_,
-                      BNx1z, MPI_DOUBLE, MPI_SUM, comm_1_);
+        if (comm_0_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_x_plane_0_z_ptr_, recv_buf_x_plane_0_z_ptr_,
+                        BNx0z, MPI_DOUBLE, MPI_SUM, comm_0_);
+        }
+        if (comm_1_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_x_plane_1_z_ptr_, recv_buf_x_plane_1_z_ptr_,
+                        BNx1z, MPI_DOUBLE, MPI_SUM, comm_1_);
+        }
     }
 #pragma acc parallel loop collapse(2)
     for (int i = 1; i < grid_size_y_; ++i)
@@ -726,10 +738,16 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_y_plane_0_z_ptr_, send_buf_y_plane_1_z_ptr_, recv_buf_y_plane_0_z_ptr_, recv_buf_y_plane_1_z_ptr_)
     {
-        MPI_Allreduce(send_buf_y_plane_0_z_ptr_, recv_buf_y_plane_0_z_ptr_,
-                      BNy0z, MPI_DOUBLE, MPI_SUM, comm_0_);
-        MPI_Allreduce(send_buf_y_plane_1_z_ptr_, recv_buf_y_plane_1_z_ptr_,
-                      BNy1z, MPI_DOUBLE, MPI_SUM, comm_1_);
+        if (comm_0_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_y_plane_0_z_ptr_, recv_buf_y_plane_0_z_ptr_,
+                        BNy0z, MPI_DOUBLE, MPI_SUM, comm_0_);
+        }
+        if (comm_1_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_y_plane_1_z_ptr_, recv_buf_y_plane_1_z_ptr_,
+                        BNy1z, MPI_DOUBLE, MPI_SUM, comm_1_);
+        }
     }
 #pragma acc parallel loop collapse(2)
     for (int i = 1; i < grid_size_x_; ++i)
@@ -755,10 +773,16 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_y_plane_0_x_ptr_, send_buf_y_plane_1_x_ptr_, recv_buf_y_plane_0_x_ptr_, recv_buf_y_plane_1_x_ptr_)
     {
-        MPI_Allreduce(send_buf_y_plane_0_x_ptr_, recv_buf_y_plane_0_x_ptr_,
-                      BNy0x, MPI_DOUBLE, MPI_SUM, comm_0_);
-        MPI_Allreduce(send_buf_y_plane_1_x_ptr_, recv_buf_y_plane_1_x_ptr_,
-                      BNy1x, MPI_DOUBLE, MPI_SUM, comm_1_);
+        if (comm_0_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_y_plane_0_x_ptr_, recv_buf_y_plane_0_x_ptr_,
+                        BNy0x, MPI_DOUBLE, MPI_SUM, comm_0_);
+        }
+        if (comm_1_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_y_plane_1_x_ptr_, recv_buf_y_plane_1_x_ptr_,
+                        BNy1x, MPI_DOUBLE, MPI_SUM, comm_1_);
+        }
     }
 #pragma acc parallel loop collapse(2)
     for (int i = 0; i < grid_size_x_; ++i)
@@ -804,10 +828,16 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_z_plane_0_x_ptr_, send_buf_z_plane_1_x_ptr_, recv_buf_z_plane_0_x_ptr_, recv_buf_z_plane_1_x_ptr_)
     {
-        MPI_Allreduce(send_buf_z_plane_0_x_ptr_, recv_buf_z_plane_0_x_ptr_,
-                      BNz0x, MPI_DOUBLE, MPI_SUM, comm_0_);
-        MPI_Allreduce(send_buf_z_plane_1_x_ptr_, recv_buf_z_plane_1_x_ptr_,
-                      BNz1x, MPI_DOUBLE, MPI_SUM, comm_1_);
+        if (comm_0_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_z_plane_0_x_ptr_, recv_buf_z_plane_0_x_ptr_,
+                          BNz0x, MPI_DOUBLE, MPI_SUM, comm_0_);
+        }
+        if (comm_1_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_z_plane_1_x_ptr_, recv_buf_z_plane_1_x_ptr_,
+                          BNz1x, MPI_DOUBLE, MPI_SUM, comm_1_);
+        }
     }
 #pragma acc parallel loop collapse(2)
     for (int i = 0; i < grid_size_x_; ++i)
@@ -833,10 +863,16 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_z_plane_0_y_ptr_, send_buf_z_plane_1_y_ptr_, recv_buf_z_plane_0_y_ptr_, recv_buf_z_plane_1_y_ptr_)
     {
-        MPI_Allreduce(send_buf_z_plane_0_y_ptr_, recv_buf_z_plane_0_y_ptr_,
-                      BNz0y, MPI_DOUBLE, MPI_SUM, comm_0_);
-        MPI_Allreduce(send_buf_z_plane_1_y_ptr_, recv_buf_z_plane_1_y_ptr_,
-                      BNz1y, MPI_DOUBLE, MPI_SUM, comm_1_);
+        if (comm_0_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_z_plane_0_y_ptr_, recv_buf_z_plane_0_y_ptr_,
+                          BNz0y, MPI_DOUBLE, MPI_SUM, comm_0_);
+        }
+        if (comm_1_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_z_plane_1_y_ptr_, recv_buf_z_plane_1_y_ptr_,
+                          BNz1y, MPI_DOUBLE, MPI_SUM, comm_1_);
+        }
     }
 #pragma acc parallel loop collapse(2)
     for (int i = 1; i < grid_size_x_; ++i)
@@ -913,14 +949,26 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_x_line_0_ptr_, send_buf_x_line_1_ptr_, send_buf_x_line_2_ptr_, send_buf_x_line_3_ptr_, recv_buf_x_line_0_ptr_, recv_buf_x_line_1_ptr_, recv_buf_x_line_2_ptr_, recv_buf_x_line_3_ptr_)
     {
-        MPI_Allreduce(send_buf_x_line_0_ptr_, recv_buf_x_line_0_ptr_,
-                      BLx0, MPI_DOUBLE, MPI_SUM, comm_0_);
-        MPI_Allreduce(send_buf_x_line_1_ptr_, recv_buf_x_line_1_ptr_,
-                      BLx1, MPI_DOUBLE, MPI_SUM, comm_1_);
-        MPI_Allreduce(send_buf_x_line_2_ptr_, recv_buf_x_line_2_ptr_,
-                      BLx2, MPI_DOUBLE, MPI_SUM, comm_2_);
-        MPI_Allreduce(send_buf_x_line_3_ptr_, recv_buf_x_line_3_ptr_,
-                      BLx3, MPI_DOUBLE, MPI_SUM, comm_3_);
+        if (comm_0_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_x_line_0_ptr_, recv_buf_x_line_0_ptr_,
+                          BLx0, MPI_DOUBLE, MPI_SUM, comm_0_);
+        }
+        if (comm_1_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_x_line_1_ptr_, recv_buf_x_line_1_ptr_,
+                          BLx1, MPI_DOUBLE, MPI_SUM, comm_1_);
+        }
+        if (comm_2_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_x_line_2_ptr_, recv_buf_x_line_2_ptr_,
+                          BLx2, MPI_DOUBLE, MPI_SUM, comm_2_);
+        }
+        if (comm_3_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_x_line_3_ptr_, recv_buf_x_line_3_ptr_,
+                          BLx3, MPI_DOUBLE, MPI_SUM, comm_3_);
+        }
     }
 #pragma acc parallel loop
     for (int i = 0; i < grid_size_x_; ++i)
@@ -998,14 +1046,26 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_y_line_0_ptr_, send_buf_y_line_1_ptr_, send_buf_y_line_2_ptr_, send_buf_y_line_3_ptr_, recv_buf_y_line_0_ptr_, recv_buf_y_line_1_ptr_, recv_buf_y_line_2_ptr_, recv_buf_y_line_3_ptr_)
     {
-        MPI_Allreduce(send_buf_y_line_0_ptr_, recv_buf_y_line_0_ptr_,
-                      BLy0, MPI_DOUBLE, MPI_SUM, comm_0_);
-        MPI_Allreduce(send_buf_y_line_1_ptr_, recv_buf_y_line_1_ptr_,
-                      BLy1, MPI_DOUBLE, MPI_SUM, comm_1_);
-        MPI_Allreduce(send_buf_y_line_2_ptr_, recv_buf_y_line_2_ptr_,
-                      BLy2, MPI_DOUBLE, MPI_SUM, comm_2_);
-        MPI_Allreduce(send_buf_y_line_3_ptr_, recv_buf_y_line_3_ptr_,
-                      BLy3, MPI_DOUBLE, MPI_SUM, comm_3_);
+        if (comm_0_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_y_line_0_ptr_, recv_buf_y_line_0_ptr_,
+                          BLy0, MPI_DOUBLE, MPI_SUM, comm_0_);
+        }
+        if (comm_1_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_y_line_1_ptr_, recv_buf_y_line_1_ptr_,
+                          BLy1, MPI_DOUBLE, MPI_SUM, comm_1_);
+        }
+        if (comm_2_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_y_line_2_ptr_, recv_buf_y_line_2_ptr_,
+                          BLy2, MPI_DOUBLE, MPI_SUM, comm_2_);
+        }
+        if (comm_3_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_y_line_3_ptr_, recv_buf_y_line_3_ptr_,
+                          BLy3, MPI_DOUBLE, MPI_SUM, comm_3_);
+        }
     }
 #pragma acc parallel loop
     for (int i = 0; i < grid_size_y_; ++i)
@@ -1083,14 +1143,26 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_z_line_0_ptr_, send_buf_z_line_1_ptr_, send_buf_z_line_2_ptr_, send_buf_z_line_3_ptr_, recv_buf_z_line_0_ptr_, recv_buf_z_line_1_ptr_, recv_buf_z_line_2_ptr_, recv_buf_z_line_3_ptr_)
     {
-        MPI_Allreduce(send_buf_z_line_0_ptr_, recv_buf_z_line_0_ptr_,
-                      BLz0, MPI_DOUBLE, MPI_SUM, comm_0_);
-        MPI_Allreduce(send_buf_z_line_1_ptr_, recv_buf_z_line_1_ptr_,
-                      BLz1, MPI_DOUBLE, MPI_SUM, comm_1_);
-        MPI_Allreduce(send_buf_z_line_2_ptr_, recv_buf_z_line_2_ptr_,
-                      BLz2, MPI_DOUBLE, MPI_SUM, comm_2_);
-        MPI_Allreduce(send_buf_z_line_3_ptr_, recv_buf_z_line_3_ptr_,
-                      BLz3, MPI_DOUBLE, MPI_SUM, comm_3_);
+        if (comm_0_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_z_line_0_ptr_, recv_buf_z_line_0_ptr_,
+                          BLz0, MPI_DOUBLE, MPI_SUM, comm_0_);
+        }
+        if (comm_1_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_z_line_1_ptr_, recv_buf_z_line_1_ptr_,
+                          BLz1, MPI_DOUBLE, MPI_SUM, comm_1_);
+        }
+        if (comm_2_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_z_line_2_ptr_, recv_buf_z_line_2_ptr_,
+                          BLz2, MPI_DOUBLE, MPI_SUM, comm_2_);
+        }
+        if (comm_3_ != MPI_COMM_NULL)
+        {
+            MPI_Allreduce(send_buf_z_line_3_ptr_, recv_buf_z_line_3_ptr_,
+                          BLz3, MPI_DOUBLE, MPI_SUM, comm_3_);
+        }
     }
 #pragma acc parallel loop
     for (int i = 0; i < grid_size_z_; ++i)
