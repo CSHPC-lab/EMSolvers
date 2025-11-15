@@ -13,7 +13,7 @@ public:
     // コンストラクタ
     FemSimulation(const std::array<int, 3> &grid_size, double domain_size, double time_step,
                   double permittivity, double permeability, int time_frequency,
-                  int use_ofem, const std::array<int, 3> &dims, const std::array<int, 3> &coords,
+                  int use_ofem, const std::array<int, 3> &dims, const std::array<int, 3> &coords, int rank,
                   MPI_Comm comm_x_plane_0, MPI_Comm comm_x_plane_1, MPI_Comm comm_y_plane_0, MPI_Comm comm_y_plane_1, MPI_Comm comm_z_plane_0, MPI_Comm comm_z_plane_1,
                   MPI_Comm comm_x_line_0, MPI_Comm comm_x_line_1, MPI_Comm comm_x_line_2, MPI_Comm comm_x_line_3,
                   MPI_Comm comm_y_line_0, MPI_Comm comm_y_line_1, MPI_Comm comm_y_line_2, MPI_Comm comm_y_line_3,
@@ -63,6 +63,7 @@ private:
     int coord_x_;
     int coord_y_;
     int coord_z_;
+    int rank_;
     MPI_Comm comm_x_plane_0_, comm_x_plane_1_, comm_y_plane_0_, comm_y_plane_1_, comm_z_plane_0_, comm_z_plane_1_;
     MPI_Comm comm_x_line_0_, comm_x_line_1_, comm_x_line_2_, comm_x_line_3_;
     MPI_Comm comm_y_line_0_, comm_y_line_1_, comm_y_line_2_, comm_y_line_3_;
@@ -83,30 +84,54 @@ private:
     std::vector<int> connectivity_z_;
 
     // bufferの配列
-    std::vector<double> buf_x_plane_0_y_;
-    std::vector<double> buf_x_plane_1_y_;
-    std::vector<double> buf_x_plane_0_z_;
-    std::vector<double> buf_x_plane_1_z_;
-    std::vector<double> buf_y_plane_0_x_;
-    std::vector<double> buf_y_plane_1_x_;
-    std::vector<double> buf_y_plane_0_z_;
-    std::vector<double> buf_y_plane_1_z_;
-    std::vector<double> buf_z_plane_0_x_;
-    std::vector<double> buf_z_plane_1_x_;
-    std::vector<double> buf_z_plane_0_y_;
-    std::vector<double> buf_z_plane_1_y_;
-    std::vector<double> buf_x_line_0_;
-    std::vector<double> buf_x_line_1_;
-    std::vector<double> buf_x_line_2_;
-    std::vector<double> buf_x_line_3_;
-    std::vector<double> buf_y_line_0_;
-    std::vector<double> buf_y_line_1_;
-    std::vector<double> buf_y_line_2_;
-    std::vector<double> buf_y_line_3_;
-    std::vector<double> buf_z_line_0_;
-    std::vector<double> buf_z_line_1_;
-    std::vector<double> buf_z_line_2_;
-    std::vector<double> buf_z_line_3_;
+    std::vector<double> send_buf_x_plane_0_y_;
+    std::vector<double> recv_buf_x_plane_0_y_;
+    std::vector<double> send_buf_x_plane_1_y_;
+    std::vector<double> recv_buf_x_plane_1_y_;
+    std::vector<double> send_buf_x_plane_0_z_;
+    std::vector<double> recv_buf_x_plane_0_z_;
+    std::vector<double> send_buf_x_plane_1_z_;
+    std::vector<double> recv_buf_x_plane_1_z_;
+    std::vector<double> send_buf_y_plane_0_x_;
+    std::vector<double> recv_buf_y_plane_0_x_;
+    std::vector<double> send_buf_y_plane_1_x_;
+    std::vector<double> recv_buf_y_plane_1_x_;
+    std::vector<double> send_buf_y_plane_0_z_;
+    std::vector<double> recv_buf_y_plane_0_z_;
+    std::vector<double> send_buf_y_plane_1_z_;
+    std::vector<double> recv_buf_y_plane_1_z_;
+    std::vector<double> send_buf_z_plane_0_x_;
+    std::vector<double> recv_buf_z_plane_0_x_;
+    std::vector<double> send_buf_z_plane_1_x_;
+    std::vector<double> recv_buf_z_plane_1_x_;
+    std::vector<double> send_buf_z_plane_0_y_;
+    std::vector<double> recv_buf_z_plane_0_y_;
+    std::vector<double> send_buf_z_plane_1_y_;
+    std::vector<double> recv_buf_z_plane_1_y_;
+    std::vector<double> send_buf_x_line_0_;
+    std::vector<double> recv_buf_x_line_0_;
+    std::vector<double> send_buf_x_line_1_;
+    std::vector<double> recv_buf_x_line_1_;
+    std::vector<double> send_buf_x_line_2_;
+    std::vector<double> recv_buf_x_line_2_;
+    std::vector<double> send_buf_x_line_3_;
+    std::vector<double> recv_buf_x_line_3_;
+    std::vector<double> send_buf_y_line_0_;
+    std::vector<double> recv_buf_y_line_0_;
+    std::vector<double> send_buf_y_line_1_;
+    std::vector<double> recv_buf_y_line_1_;
+    std::vector<double> send_buf_y_line_2_;
+    std::vector<double> recv_buf_y_line_2_;
+    std::vector<double> send_buf_y_line_3_;
+    std::vector<double> recv_buf_y_line_3_;
+    std::vector<double> send_buf_z_line_0_;
+    std::vector<double> recv_buf_z_line_0_;
+    std::vector<double> send_buf_z_line_1_;
+    std::vector<double> recv_buf_z_line_1_;
+    std::vector<double> send_buf_z_line_2_;
+    std::vector<double> recv_buf_z_line_2_;
+    std::vector<double> send_buf_z_line_3_;
+    std::vector<double> recv_buf_z_line_3_;
 
     // 要素数
     int ENx;

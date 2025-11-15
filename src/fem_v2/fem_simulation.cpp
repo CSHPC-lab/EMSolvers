@@ -82,7 +82,7 @@ double source_function(double t, double permeability, double domain_size)
 
 FemSimulation::FemSimulation(const std::array<int, 3> &grid_size, double domain_size,
                              double time_step, double permittivity, double permeability,
-                             int time_frequency, int use_ofem, const std::array<int, 3> &dims, const std::array<int, 3> &coords,
+                             int time_frequency, int use_ofem, const std::array<int, 3> &dims, const std::array<int, 3> &coords, int rank,
                              MPI_Comm comm_x_plane_0, MPI_Comm comm_x_plane_1, MPI_Comm comm_y_plane_0, MPI_Comm comm_y_plane_1, MPI_Comm comm_z_plane_0, MPI_Comm comm_z_plane_1,
                              MPI_Comm comm_x_line_0, MPI_Comm comm_x_line_1, MPI_Comm comm_x_line_2, MPI_Comm comm_x_line_3,
                              MPI_Comm comm_y_line_0, MPI_Comm comm_y_line_1, MPI_Comm comm_y_line_2, MPI_Comm comm_y_line_3,
@@ -110,6 +110,7 @@ FemSimulation::FemSimulation(const std::array<int, 3> &grid_size, double domain_
       coord_x_(coords[0]),
       coord_y_(coords[1]),
       coord_z_(coords[2]),
+      rank_(rank),
       comm_x_plane_0_(comm_x_plane_0),
       comm_x_plane_1_(comm_x_plane_1),
       comm_y_plane_0_(comm_y_plane_0),
@@ -163,30 +164,54 @@ void FemSimulation::initializeMesh()
     connectivity_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) * 4, 0);
     connectivity_y_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) * 4, 0);
     connectivity_z_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) * 4, 0);
-    buf_x_plane_0_y_.resize(static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
-    buf_x_plane_1_y_.resize(static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
-    buf_x_plane_0_z_.resize(static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
-    buf_x_plane_1_z_.resize(static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
-    buf_y_plane_0_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
-    buf_y_plane_1_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
-    buf_y_plane_0_z_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
-    buf_y_plane_1_z_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
-    buf_z_plane_0_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_ + 1), 0.0);
-    buf_z_plane_1_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_ + 1), 0.0);
-    buf_z_plane_0_y_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_), 0.0);
-    buf_z_plane_1_y_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_), 0.0);
-    buf_x_line_0_.resize(static_cast<size_t>(grid_size_x_), 0.0);
-    buf_x_line_1_.resize(static_cast<size_t>(grid_size_x_), 0.0);
-    buf_x_line_2_.resize(static_cast<size_t>(grid_size_x_), 0.0);
-    buf_x_line_3_.resize(static_cast<size_t>(grid_size_x_), 0.0);
-    buf_y_line_0_.resize(static_cast<size_t>(grid_size_y_), 0.0);
-    buf_y_line_1_.resize(static_cast<size_t>(grid_size_y_), 0.0);
-    buf_y_line_2_.resize(static_cast<size_t>(grid_size_y_), 0.0);
-    buf_y_line_3_.resize(static_cast<size_t>(grid_size_y_), 0.0);
-    buf_z_line_0_.resize(static_cast<size_t>(grid_size_z_), 0.0);
-    buf_z_line_1_.resize(static_cast<size_t>(grid_size_z_), 0.0);
-    buf_z_line_2_.resize(static_cast<size_t>(grid_size_z_), 0.0);
-    buf_z_line_3_.resize(static_cast<size_t>(grid_size_z_), 0.0);
+    send_buf_x_plane_0_y_.resize(static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    recv_buf_x_plane_0_y_.resize(static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    send_buf_x_plane_1_y_.resize(static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    recv_buf_x_plane_1_y_.resize(static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    send_buf_x_plane_0_z_.resize(static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
+    recv_buf_x_plane_0_z_.resize(static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
+    send_buf_x_plane_1_z_.resize(static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
+    recv_buf_x_plane_1_z_.resize(static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
+    send_buf_y_plane_0_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    recv_buf_y_plane_0_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    send_buf_y_plane_1_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    recv_buf_y_plane_1_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    send_buf_y_plane_0_z_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
+    recv_buf_y_plane_0_z_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
+    send_buf_y_plane_1_z_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
+    recv_buf_y_plane_1_z_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
+    send_buf_z_plane_0_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_ + 1), 0.0);
+    recv_buf_z_plane_0_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_ + 1), 0.0);
+    send_buf_z_plane_1_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_ + 1), 0.0);
+    recv_buf_z_plane_1_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_ + 1), 0.0);
+    send_buf_z_plane_0_y_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_), 0.0);
+    recv_buf_z_plane_0_y_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_), 0.0);
+    send_buf_z_plane_1_y_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_), 0.0);
+    recv_buf_z_plane_1_y_.resize(static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_), 0.0);
+    send_buf_x_line_0_.resize(static_cast<size_t>(grid_size_x_), 0.0);
+    recv_buf_x_line_0_.resize(static_cast<size_t>(grid_size_x_), 0.0);
+    send_buf_x_line_1_.resize(static_cast<size_t>(grid_size_x_), 0.0);
+    recv_buf_x_line_1_.resize(static_cast<size_t>(grid_size_x_), 0.0);
+    send_buf_x_line_2_.resize(static_cast<size_t>(grid_size_x_), 0.0);
+    recv_buf_x_line_2_.resize(static_cast<size_t>(grid_size_x_), 0.0);
+    send_buf_x_line_3_.resize(static_cast<size_t>(grid_size_x_), 0.0);
+    recv_buf_x_line_3_.resize(static_cast<size_t>(grid_size_x_), 0.0);
+    send_buf_y_line_0_.resize(static_cast<size_t>(grid_size_y_), 0.0);
+    recv_buf_y_line_0_.resize(static_cast<size_t>(grid_size_y_), 0.0);
+    send_buf_y_line_1_.resize(static_cast<size_t>(grid_size_y_), 0.0);
+    recv_buf_y_line_1_.resize(static_cast<size_t>(grid_size_y_), 0.0);
+    send_buf_y_line_2_.resize(static_cast<size_t>(grid_size_y_), 0.0);
+    recv_buf_y_line_2_.resize(static_cast<size_t>(grid_size_y_), 0.0);
+    send_buf_y_line_3_.resize(static_cast<size_t>(grid_size_y_), 0.0);
+    recv_buf_y_line_3_.resize(static_cast<size_t>(grid_size_y_), 0.0);
+    send_buf_z_line_0_.resize(static_cast<size_t>(grid_size_z_), 0.0);
+    recv_buf_z_line_0_.resize(static_cast<size_t>(grid_size_z_), 0.0);
+    send_buf_z_line_1_.resize(static_cast<size_t>(grid_size_z_), 0.0);
+    recv_buf_z_line_1_.resize(static_cast<size_t>(grid_size_z_), 0.0);
+    send_buf_z_line_2_.resize(static_cast<size_t>(grid_size_z_), 0.0);
+    recv_buf_z_line_2_.resize(static_cast<size_t>(grid_size_z_), 0.0);
+    send_buf_z_line_3_.resize(static_cast<size_t>(grid_size_z_), 0.0);
+    recv_buf_z_line_3_.resize(static_cast<size_t>(grid_size_z_), 0.0);
     
     ef_x_ptr_ = electric_field_x_.data();
     ef_y_ptr_ = electric_field_y_.data();
@@ -194,54 +219,54 @@ void FemSimulation::initializeMesh()
     conn_x_ptr_ = connectivity_x_.data();
     conn_y_ptr_ = connectivity_y_.data();
     conn_z_ptr_ = connectivity_z_.data();
-    send_buf_x_plane_0_y_ptr_ = buf_x_plane_0_y_.data();
-    recv_buf_x_plane_0_y_ptr_ = buf_x_plane_0_y_.data();
-    send_buf_x_plane_1_y_ptr_ = buf_x_plane_1_y_.data();
-    recv_buf_x_plane_1_y_ptr_ = buf_x_plane_1_y_.data();
-    send_buf_x_plane_0_z_ptr_ = buf_x_plane_0_z_.data();
-    recv_buf_x_plane_0_z_ptr_ = buf_x_plane_0_z_.data();
-    send_buf_x_plane_1_z_ptr_ = buf_x_plane_1_z_.data();
-    recv_buf_x_plane_1_z_ptr_ = buf_x_plane_1_z_.data();
-    send_buf_y_plane_0_x_ptr_ = buf_y_plane_0_x_.data();
-    recv_buf_y_plane_0_x_ptr_ = buf_y_plane_0_x_.data();
-    send_buf_y_plane_1_x_ptr_ = buf_y_plane_1_x_.data();
-    recv_buf_y_plane_1_x_ptr_ = buf_y_plane_1_x_.data();
-    send_buf_y_plane_0_z_ptr_ = buf_y_plane_0_z_.data();
-    recv_buf_y_plane_0_z_ptr_ = buf_y_plane_0_z_.data();
-    send_buf_y_plane_1_z_ptr_ = buf_y_plane_1_z_.data();
-    recv_buf_y_plane_1_z_ptr_ = buf_y_plane_1_z_.data();
-    send_buf_z_plane_0_x_ptr_ = buf_z_plane_0_x_.data();
-    recv_buf_z_plane_0_x_ptr_ = buf_z_plane_0_x_.data();
-    send_buf_z_plane_1_x_ptr_ = buf_z_plane_1_x_.data();
-    recv_buf_z_plane_1_x_ptr_ = buf_z_plane_1_x_.data();
-    send_buf_z_plane_0_y_ptr_ = buf_z_plane_0_y_.data();
-    recv_buf_z_plane_0_y_ptr_ = buf_z_plane_0_y_.data();
-    send_buf_z_plane_1_y_ptr_ = buf_z_plane_1_y_.data();
-    recv_buf_z_plane_1_y_ptr_ = buf_z_plane_1_y_.data();
-    send_buf_x_line_0_ptr_ = buf_x_line_0_.data();
-    recv_buf_x_line_0_ptr_ = buf_x_line_0_.data();
-    send_buf_x_line_1_ptr_ = buf_x_line_1_.data();
-    recv_buf_x_line_1_ptr_ = buf_x_line_1_.data();
-    send_buf_x_line_2_ptr_ = buf_x_line_2_.data();
-    recv_buf_x_line_2_ptr_ = buf_x_line_2_.data();
-    send_buf_x_line_3_ptr_ = buf_x_line_3_.data();
-    recv_buf_x_line_3_ptr_ = buf_x_line_3_.data();
-    send_buf_y_line_0_ptr_ = buf_y_line_0_.data();
-    recv_buf_y_line_0_ptr_ = buf_y_line_0_.data();
-    send_buf_y_line_1_ptr_ = buf_y_line_1_.data();
-    recv_buf_y_line_1_ptr_ = buf_y_line_1_.data();
-    send_buf_y_line_2_ptr_ = buf_y_line_2_.data();
-    recv_buf_y_line_2_ptr_ = buf_y_line_2_.data();
-    send_buf_y_line_3_ptr_ = buf_y_line_3_.data();
-    recv_buf_y_line_3_ptr_ = buf_y_line_3_.data();
-    send_buf_z_line_0_ptr_ = buf_z_line_0_.data();
-    recv_buf_z_line_0_ptr_ = buf_z_line_0_.data();
-    send_buf_z_line_1_ptr_ = buf_z_line_1_.data();
-    recv_buf_z_line_1_ptr_ = buf_z_line_1_.data();
-    send_buf_z_line_2_ptr_ = buf_z_line_2_.data();
-    recv_buf_z_line_2_ptr_ = buf_z_line_2_.data();
-    send_buf_z_line_3_ptr_ = buf_z_line_3_.data();
-    recv_buf_z_line_3_ptr_ = buf_z_line_3_.data();
+    send_buf_x_plane_0_y_ptr_ = send_buf_x_plane_0_y_.data();
+    recv_buf_x_plane_0_y_ptr_ = recv_buf_x_plane_0_y_.data();
+    send_buf_x_plane_1_y_ptr_ = send_buf_x_plane_1_y_.data();
+    recv_buf_x_plane_1_y_ptr_ = recv_buf_x_plane_1_y_.data();
+    send_buf_x_plane_0_z_ptr_ = send_buf_x_plane_0_z_.data();
+    recv_buf_x_plane_0_z_ptr_ = recv_buf_x_plane_0_z_.data();
+    send_buf_x_plane_1_z_ptr_ = send_buf_x_plane_1_z_.data();
+    recv_buf_x_plane_1_z_ptr_ = recv_buf_x_plane_1_z_.data();
+    send_buf_y_plane_0_x_ptr_ = send_buf_y_plane_0_x_.data();
+    recv_buf_y_plane_0_x_ptr_ = recv_buf_y_plane_0_x_.data();
+    send_buf_y_plane_1_x_ptr_ = send_buf_y_plane_1_x_.data();
+    recv_buf_y_plane_1_x_ptr_ = recv_buf_y_plane_1_x_.data();
+    send_buf_y_plane_0_z_ptr_ = send_buf_y_plane_0_z_.data();
+    recv_buf_y_plane_0_z_ptr_ = recv_buf_y_plane_0_z_.data();
+    send_buf_y_plane_1_z_ptr_ = send_buf_y_plane_1_z_.data();
+    recv_buf_y_plane_1_z_ptr_ = recv_buf_y_plane_1_z_.data();
+    send_buf_z_plane_0_x_ptr_ = send_buf_z_plane_0_x_.data();
+    recv_buf_z_plane_0_x_ptr_ = recv_buf_z_plane_0_x_.data();
+    send_buf_z_plane_1_x_ptr_ = send_buf_z_plane_1_x_.data();
+    recv_buf_z_plane_1_x_ptr_ = recv_buf_z_plane_1_x_.data();
+    send_buf_z_plane_0_y_ptr_ = send_buf_z_plane_0_y_.data();
+    recv_buf_z_plane_0_y_ptr_ = recv_buf_z_plane_0_y_.data();
+    send_buf_z_plane_1_y_ptr_ = send_buf_z_plane_1_y_.data();
+    recv_buf_z_plane_1_y_ptr_ = recv_buf_z_plane_1_y_.data();
+    send_buf_x_line_0_ptr_ = send_buf_x_line_0_.data();
+    recv_buf_x_line_0_ptr_ = recv_buf_x_line_0_.data();
+    send_buf_x_line_1_ptr_ = send_buf_x_line_1_.data();
+    recv_buf_x_line_1_ptr_ = recv_buf_x_line_1_.data();
+    send_buf_x_line_2_ptr_ = send_buf_x_line_2_.data();
+    recv_buf_x_line_2_ptr_ = recv_buf_x_line_2_.data();
+    send_buf_x_line_3_ptr_ = send_buf_x_line_3_.data();
+    recv_buf_x_line_3_ptr_ = recv_buf_x_line_3_.data();
+    send_buf_y_line_0_ptr_ = send_buf_y_line_0_.data();
+    recv_buf_y_line_0_ptr_ = recv_buf_y_line_0_.data();
+    send_buf_y_line_1_ptr_ = send_buf_y_line_1_.data();
+    recv_buf_y_line_1_ptr_ = recv_buf_y_line_1_.data();
+    send_buf_y_line_2_ptr_ = send_buf_y_line_2_.data();
+    recv_buf_y_line_2_ptr_ = recv_buf_y_line_2_.data();
+    send_buf_y_line_3_ptr_ = send_buf_y_line_3_.data();
+    recv_buf_y_line_3_ptr_ = recv_buf_y_line_3_.data();
+    send_buf_z_line_0_ptr_ = send_buf_z_line_0_.data();
+    recv_buf_z_line_0_ptr_ = recv_buf_z_line_0_.data();
+    send_buf_z_line_1_ptr_ = send_buf_z_line_1_.data();
+    recv_buf_z_line_1_ptr_ = recv_buf_z_line_1_.data();
+    send_buf_z_line_2_ptr_ = send_buf_z_line_2_.data();
+    recv_buf_z_line_2_ptr_ = recv_buf_z_line_2_.data();
+    send_buf_z_line_3_ptr_ = send_buf_z_line_3_.data();
+    recv_buf_z_line_3_ptr_ = recv_buf_z_line_3_.data();
 
     ENx = electric_field_x_.size();
     ENy = electric_field_y_.size();
@@ -249,30 +274,30 @@ void FemSimulation::initializeMesh()
     CNx = connectivity_x_.size();
     CNy = connectivity_y_.size();
     CNz = connectivity_z_.size();
-    BNx0y = buf_x_plane_0_y_.size();
-    BNx1y = buf_x_plane_1_y_.size();
-    BNx0z = buf_x_plane_0_z_.size();
-    BNx1z = buf_x_plane_1_z_.size();
-    BNy0x = buf_y_plane_0_x_.size();
-    BNy1x = buf_y_plane_1_x_.size();
-    BNy0z = buf_y_plane_0_z_.size();
-    BNy1z = buf_y_plane_1_z_.size();
-    BNz0x = buf_z_plane_0_x_.size();
-    BNz1x = buf_z_plane_1_x_.size();
-    BNz0y = buf_z_plane_0_y_.size();
-    BNz1y = buf_z_plane_1_y_.size();
-    BLx0 = buf_x_line_0_.size();
-    BLx1 = buf_x_line_1_.size();
-    BLx2 = buf_x_line_2_.size();
-    BLx3 = buf_x_line_3_.size();
-    BLy0 = buf_y_line_0_.size();
-    BLy1 = buf_y_line_1_.size();
-    BLy2 = buf_y_line_2_.size();
-    BLy3 = buf_y_line_3_.size();
-    BLz0 = buf_z_line_0_.size();
-    BLz1 = buf_z_line_1_.size();
-    BLz2 = buf_z_line_2_.size();
-    BLz3 = buf_z_line_3_.size();
+    BNx0y = send_buf_x_plane_0_y_.size();
+    BNx1y = send_buf_x_plane_1_y_.size();
+    BNx0z = send_buf_x_plane_0_z_.size();
+    BNx1z = send_buf_x_plane_1_z_.size();
+    BNy0x = send_buf_y_plane_0_x_.size();
+    BNy1x = send_buf_y_plane_1_x_.size();
+    BNy0z = send_buf_y_plane_0_z_.size();
+    BNy1z = send_buf_y_plane_1_z_.size();
+    BNz0x = send_buf_z_plane_0_x_.size();
+    BNz1x = send_buf_z_plane_1_x_.size();
+    BNz0y = send_buf_z_plane_0_y_.size();
+    BNz1y = send_buf_z_plane_1_y_.size();
+    BLx0 = send_buf_x_line_0_.size();
+    BLx1 = send_buf_x_line_1_.size();
+    BLx2 = send_buf_x_line_2_.size();
+    BLx3 = send_buf_x_line_3_.size();
+    BLy0 = send_buf_y_line_0_.size();
+    BLy1 = send_buf_y_line_1_.size();
+    BLy2 = send_buf_y_line_2_.size();
+    BLy3 = send_buf_y_line_3_.size();
+    BLz0 = send_buf_z_line_0_.size();
+    BLz1 = send_buf_z_line_1_.size();
+    BLz2 = send_buf_z_line_2_.size();
+    BLz3 = send_buf_z_line_3_.size();
 
 #pragma acc data copyin(ef_x_ptr_[0 : ENx])
 #pragma acc data copyin(ef_y_ptr_[0 : ENy])
@@ -617,24 +642,8 @@ void FemSimulation::exchangeElectricField()
 {
     MPI_Comm comm_0_, comm_1_, comm_2_, comm_3_;
 
-    if (coord_x_ % 2 == 0)
-    {
-        comm_0_ = comm_x_plane_0_;
-        comm_1_ = comm_x_plane_1_;
-    }
-    else
-    {
-        comm_0_ = comm_x_plane_1_;
-        comm_1_ = comm_x_plane_0_;
-    }
-    if (coord_x_ == 0)
-    {
-        comm_0_ = MPI_COMM_NULL;
-    }
-    if (coord_x_ == dim_x_ - 1)
-    {
-        comm_1_ = MPI_COMM_NULL;
-    }
+    comm_0_ = coord_x_ % 2 == 0 ? comm_x_plane_0_ : comm_x_plane_1_;
+    comm_1_ = coord_x_ % 2 == 0 ? comm_x_plane_1_ : comm_x_plane_0_;
 #pragma acc parallel loop collapse(2)
     for (int i = 0; i < grid_size_y_; ++i)
     {
@@ -648,12 +657,12 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_x_plane_0_y_ptr_, send_buf_x_plane_1_y_ptr_, recv_buf_x_plane_0_y_ptr_, recv_buf_x_plane_1_y_ptr_)
     {
-        if (comm_0_ != MPI_COMM_NULL)
+        if (coord_x_ != 0)
         {
             MPI_Allreduce(send_buf_x_plane_0_y_ptr_, recv_buf_x_plane_0_y_ptr_,
                         BNx0y, MPI_DOUBLE, MPI_SUM, comm_0_);
         }
-        if (comm_1_ != MPI_COMM_NULL)
+        if (coord_x_ != dim_x_ - 1)
         {
             MPI_Allreduce(send_buf_x_plane_1_y_ptr_, recv_buf_x_plane_1_y_ptr_,
                         BNx1y, MPI_DOUBLE, MPI_SUM, comm_1_);
@@ -683,12 +692,12 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_x_plane_0_z_ptr_, send_buf_x_plane_1_z_ptr_, recv_buf_x_plane_0_z_ptr_, recv_buf_x_plane_1_z_ptr_)
     {
-        if (comm_0_ != MPI_COMM_NULL)
+        if (coord_x_ != 0)
         {
             MPI_Allreduce(send_buf_x_plane_0_z_ptr_, recv_buf_x_plane_0_z_ptr_,
                         BNx0z, MPI_DOUBLE, MPI_SUM, comm_0_);
         }
-        if (comm_1_ != MPI_COMM_NULL)
+        if (coord_x_ != dim_x_ - 1)
         {
             MPI_Allreduce(send_buf_x_plane_1_z_ptr_, recv_buf_x_plane_1_z_ptr_,
                         BNx1z, MPI_DOUBLE, MPI_SUM, comm_1_);
@@ -707,24 +716,8 @@ void FemSimulation::exchangeElectricField()
     }
 
 
-    if (coord_y_ % 2 == 0)
-    {
-        comm_0_ = comm_y_plane_0_;
-        comm_1_ = comm_y_plane_1_;
-    }
-    else
-    {
-        comm_0_ = comm_y_plane_1_;
-        comm_1_ = comm_y_plane_0_;
-    }
-    if (coord_y_ == 0)
-    {
-        comm_0_ = MPI_COMM_NULL;
-    }
-    if (coord_y_ == dim_y_ - 1)
-    {
-        comm_1_ = MPI_COMM_NULL;
-    }
+    comm_0_ = coord_y_ % 2 == 0 ? comm_y_plane_0_ : comm_y_plane_1_;
+    comm_1_ = coord_y_ % 2 == 0 ? comm_y_plane_1_ : comm_y_plane_0_;
 #pragma acc parallel loop collapse(2)
     for (int i = 0; i < grid_size_x_ + 1; ++i)
     {
@@ -738,12 +731,12 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_y_plane_0_z_ptr_, send_buf_y_plane_1_z_ptr_, recv_buf_y_plane_0_z_ptr_, recv_buf_y_plane_1_z_ptr_)
     {
-        if (comm_0_ != MPI_COMM_NULL)
+        if (coord_y_ != 0)
         {
             MPI_Allreduce(send_buf_y_plane_0_z_ptr_, recv_buf_y_plane_0_z_ptr_,
                         BNy0z, MPI_DOUBLE, MPI_SUM, comm_0_);
         }
-        if (comm_1_ != MPI_COMM_NULL)
+        if (coord_y_ != dim_y_ - 1)
         {
             MPI_Allreduce(send_buf_y_plane_1_z_ptr_, recv_buf_y_plane_1_z_ptr_,
                         BNy1z, MPI_DOUBLE, MPI_SUM, comm_1_);
@@ -773,12 +766,12 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_y_plane_0_x_ptr_, send_buf_y_plane_1_x_ptr_, recv_buf_y_plane_0_x_ptr_, recv_buf_y_plane_1_x_ptr_)
     {
-        if (comm_0_ != MPI_COMM_NULL)
+        if (coord_y_ != 0)
         {
             MPI_Allreduce(send_buf_y_plane_0_x_ptr_, recv_buf_y_plane_0_x_ptr_,
                         BNy0x, MPI_DOUBLE, MPI_SUM, comm_0_);
         }
-        if (comm_1_ != MPI_COMM_NULL)
+        if (coord_y_ != dim_y_ - 1)
         {
             MPI_Allreduce(send_buf_y_plane_1_x_ptr_, recv_buf_y_plane_1_x_ptr_,
                         BNy1x, MPI_DOUBLE, MPI_SUM, comm_1_);
@@ -797,24 +790,8 @@ void FemSimulation::exchangeElectricField()
     }
 
 
-    if (coord_z_ % 2 == 0)
-    {
-        comm_0_ = comm_z_plane_0_;
-        comm_1_ = comm_z_plane_1_;
-    }
-    else
-    {
-        comm_0_ = comm_z_plane_1_;
-        comm_1_ = comm_z_plane_0_;
-    }
-    if (coord_z_ == 0)
-    {
-        comm_0_ = MPI_COMM_NULL;
-    }
-    if (coord_z_ == dim_z_ - 1)
-    {
-        comm_1_ = MPI_COMM_NULL;
-    }
+    comm_0_ = coord_z_ % 2 == 0 ? comm_z_plane_0_ : comm_z_plane_1_;
+    comm_1_ = coord_z_ % 2 == 0 ? comm_z_plane_1_ : comm_z_plane_0_;
 #pragma acc parallel loop collapse(2)
     for (int i = 0; i < grid_size_x_; ++i)
     {
@@ -828,12 +805,12 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_z_plane_0_x_ptr_, send_buf_z_plane_1_x_ptr_, recv_buf_z_plane_0_x_ptr_, recv_buf_z_plane_1_x_ptr_)
     {
-        if (comm_0_ != MPI_COMM_NULL)
+        if (coord_z_ != 0)
         {
             MPI_Allreduce(send_buf_z_plane_0_x_ptr_, recv_buf_z_plane_0_x_ptr_,
                           BNz0x, MPI_DOUBLE, MPI_SUM, comm_0_);
         }
-        if (comm_1_ != MPI_COMM_NULL)
+        if (coord_z_ != dim_z_ - 1)
         {
             MPI_Allreduce(send_buf_z_plane_1_x_ptr_, recv_buf_z_plane_1_x_ptr_,
                           BNz1x, MPI_DOUBLE, MPI_SUM, comm_1_);
@@ -863,12 +840,12 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_z_plane_0_y_ptr_, send_buf_z_plane_1_y_ptr_, recv_buf_z_plane_0_y_ptr_, recv_buf_z_plane_1_y_ptr_)
     {
-        if (comm_0_ != MPI_COMM_NULL)
+        if (coord_z_ != 0)
         {
             MPI_Allreduce(send_buf_z_plane_0_y_ptr_, recv_buf_z_plane_0_y_ptr_,
                           BNz0y, MPI_DOUBLE, MPI_SUM, comm_0_);
         }
-        if (comm_1_ != MPI_COMM_NULL)
+        if (coord_z_ != dim_z_ - 1)
         {
             MPI_Allreduce(send_buf_z_plane_1_y_ptr_, recv_buf_z_plane_1_y_ptr_,
                           BNz1y, MPI_DOUBLE, MPI_SUM, comm_1_);
@@ -915,26 +892,6 @@ void FemSimulation::exchangeElectricField()
         comm_2_ = comm_x_line_1_;
         comm_3_ = comm_x_line_0_;
     }
-    if (coord_y_ == 0)
-    {
-        comm_0_ = MPI_COMM_NULL;
-        comm_2_ = MPI_COMM_NULL;
-    }
-    if (coord_y_ == dim_y_ - 1)
-    {
-        comm_1_ = MPI_COMM_NULL;
-        comm_3_ = MPI_COMM_NULL;
-    }
-    if (coord_z_ == 0)
-    {
-        comm_0_ = MPI_COMM_NULL;
-        comm_1_ = MPI_COMM_NULL;
-    }
-    if (coord_z_ == dim_z_ - 1)
-    {
-        comm_2_ = MPI_COMM_NULL;
-        comm_3_ = MPI_COMM_NULL;
-    }
 #pragma acc parallel loop
     for (int i = 0; i < grid_size_x_; ++i)
     {
@@ -949,22 +906,22 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_x_line_0_ptr_, send_buf_x_line_1_ptr_, send_buf_x_line_2_ptr_, send_buf_x_line_3_ptr_, recv_buf_x_line_0_ptr_, recv_buf_x_line_1_ptr_, recv_buf_x_line_2_ptr_, recv_buf_x_line_3_ptr_)
     {
-        if (comm_0_ != MPI_COMM_NULL)
+        if (coord_y_ != 0 && coord_z_ != 0)
         {
             MPI_Allreduce(send_buf_x_line_0_ptr_, recv_buf_x_line_0_ptr_,
                           BLx0, MPI_DOUBLE, MPI_SUM, comm_0_);
         }
-        if (comm_1_ != MPI_COMM_NULL)
+        if (coord_y_ != dim_y_ - 1 && coord_z_ != 0)
         {
             MPI_Allreduce(send_buf_x_line_1_ptr_, recv_buf_x_line_1_ptr_,
                           BLx1, MPI_DOUBLE, MPI_SUM, comm_1_);
         }
-        if (comm_2_ != MPI_COMM_NULL)
+        if (coord_y_ != 0 && coord_z_ != dim_z_ - 1)
         {
             MPI_Allreduce(send_buf_x_line_2_ptr_, recv_buf_x_line_2_ptr_,
                           BLx2, MPI_DOUBLE, MPI_SUM, comm_2_);
         }
-        if (comm_3_ != MPI_COMM_NULL)
+        if (coord_y_ != dim_y_ - 1 && coord_z_ != dim_z_ - 1)
         {
             MPI_Allreduce(send_buf_x_line_3_ptr_, recv_buf_x_line_3_ptr_,
                           BLx3, MPI_DOUBLE, MPI_SUM, comm_3_);
@@ -1012,26 +969,6 @@ void FemSimulation::exchangeElectricField()
         comm_2_ = comm_y_line_1_;
         comm_3_ = comm_y_line_0_;
     }
-    if (coord_z_ == 0)
-    {
-        comm_0_ = MPI_COMM_NULL;
-        comm_2_ = MPI_COMM_NULL;
-    }
-    if (coord_z_ == dim_z_ - 1)
-    {
-        comm_1_ = MPI_COMM_NULL;
-        comm_3_ = MPI_COMM_NULL;
-    }
-    if (coord_x_ == 0)
-    {
-        comm_0_ = MPI_COMM_NULL;
-        comm_1_ = MPI_COMM_NULL;
-    }
-    if (coord_x_ == dim_x_ - 1)
-    {
-        comm_2_ = MPI_COMM_NULL;
-        comm_3_ = MPI_COMM_NULL;
-    }
 #pragma acc parallel loop
     for (int i = 0; i < grid_size_y_; ++i)
     {
@@ -1046,22 +983,22 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_y_line_0_ptr_, send_buf_y_line_1_ptr_, send_buf_y_line_2_ptr_, send_buf_y_line_3_ptr_, recv_buf_y_line_0_ptr_, recv_buf_y_line_1_ptr_, recv_buf_y_line_2_ptr_, recv_buf_y_line_3_ptr_)
     {
-        if (comm_0_ != MPI_COMM_NULL)
+        if (coord_z_ != 0 && coord_x_ != 0)
         {
             MPI_Allreduce(send_buf_y_line_0_ptr_, recv_buf_y_line_0_ptr_,
                           BLy0, MPI_DOUBLE, MPI_SUM, comm_0_);
         }
-        if (comm_1_ != MPI_COMM_NULL)
+        if (coord_z_ != dim_z_ - 1 && coord_x_ != 0)
         {
             MPI_Allreduce(send_buf_y_line_1_ptr_, recv_buf_y_line_1_ptr_,
                           BLy1, MPI_DOUBLE, MPI_SUM, comm_1_);
         }
-        if (comm_2_ != MPI_COMM_NULL)
+        if (coord_z_ != 0 && coord_x_ != dim_x_ - 1)
         {
             MPI_Allreduce(send_buf_y_line_2_ptr_, recv_buf_y_line_2_ptr_,
                           BLy2, MPI_DOUBLE, MPI_SUM, comm_2_);
         }
-        if (comm_3_ != MPI_COMM_NULL)
+        if (coord_z_ != dim_z_ - 1 && coord_x_ != dim_x_ - 1)
         {
             MPI_Allreduce(send_buf_y_line_3_ptr_, recv_buf_y_line_3_ptr_,
                           BLy3, MPI_DOUBLE, MPI_SUM, comm_3_);
@@ -1109,26 +1046,6 @@ void FemSimulation::exchangeElectricField()
         comm_2_ = comm_z_line_1_;
         comm_3_ = comm_z_line_0_;
     }
-    if (coord_x_ == 0)
-    {
-        comm_0_ = MPI_COMM_NULL;
-        comm_2_ = MPI_COMM_NULL;
-    }
-    if (coord_x_ == dim_x_ - 1)
-    {
-        comm_1_ = MPI_COMM_NULL;
-        comm_3_ = MPI_COMM_NULL;
-    }
-    if (coord_y_ == 0)
-    {
-        comm_0_ = MPI_COMM_NULL;
-        comm_1_ = MPI_COMM_NULL;
-    }
-    if (coord_y_ == dim_y_ - 1)
-    {
-        comm_2_ = MPI_COMM_NULL;
-        comm_3_ = MPI_COMM_NULL;
-    }
 #pragma acc parallel loop
     for (int i = 0; i < grid_size_z_; ++i)
     {
@@ -1143,22 +1060,22 @@ void FemSimulation::exchangeElectricField()
     }
 #pragma acc host_data use_device(send_buf_z_line_0_ptr_, send_buf_z_line_1_ptr_, send_buf_z_line_2_ptr_, send_buf_z_line_3_ptr_, recv_buf_z_line_0_ptr_, recv_buf_z_line_1_ptr_, recv_buf_z_line_2_ptr_, recv_buf_z_line_3_ptr_)
     {
-        if (comm_0_ != MPI_COMM_NULL)
+        if (coord_x_ != 0 && coord_y_ != 0)
         {
             MPI_Allreduce(send_buf_z_line_0_ptr_, recv_buf_z_line_0_ptr_,
                           BLz0, MPI_DOUBLE, MPI_SUM, comm_0_);
         }
-        if (comm_1_ != MPI_COMM_NULL)
+        if (coord_x_ != dim_x_ - 1 && coord_y_ != 0)
         {
             MPI_Allreduce(send_buf_z_line_1_ptr_, recv_buf_z_line_1_ptr_,
                           BLz1, MPI_DOUBLE, MPI_SUM, comm_1_);
         }
-        if (comm_2_ != MPI_COMM_NULL)
+        if (coord_x_ != 0 && coord_y_ != dim_y_ - 1)
         {
             MPI_Allreduce(send_buf_z_line_2_ptr_, recv_buf_z_line_2_ptr_,
                           BLz2, MPI_DOUBLE, MPI_SUM, comm_2_);
         }
-        if (comm_3_ != MPI_COMM_NULL)
+        if (coord_x_ != dim_x_ - 1 && coord_y_ != dim_y_ - 1)
         {
             MPI_Allreduce(send_buf_z_line_3_ptr_, recv_buf_z_line_3_ptr_,
                           BLz3, MPI_DOUBLE, MPI_SUM, comm_3_);
@@ -1330,10 +1247,10 @@ void FemSimulation::run(int num_steps)
     {
         if (step % 100 == 0)
         {
-            std::cerr << "step: " << step << std::endl;
+            std::cout << "rank: " << rank_ << " step: " << step << std::endl;
         }
         updateTimeStep();
-        applyBoundaryConditions();
+        // applyBoundaryConditions();
 
         // 観測点での値を保存
         if (step % time_frequency_ == 0)
@@ -1379,7 +1296,7 @@ void FemSimulation::run(int num_steps)
         time_1_ = (time_1_ + 1) % 3;
         time_2_ = (time_2_ + 1) % 3;
     }
-    std::cout << "Total communication time: " << total_communication_time_ << " seconds" << std::endl;
+    std::cout << "rank: " << rank_ << " Total communication time: " << total_communication_time_ << " seconds" << std::endl;
 }
 
 void FemSimulation::saveResults(int num_steps, const std::string &filename)
@@ -1389,7 +1306,7 @@ void FemSimulation::saveResults(int num_steps, const std::string &filename)
         std::ofstream file(filename);
         if (!file.is_open())
         {
-            std::cerr << "Error: Could not open file " << filename << std::endl;
+            std::cerr << "rank: " << rank_ << " Error: Could not open file " << filename << std::endl;
             return;
         }
 
