@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
     std::cout << "rank: " << rank << " Simulation completed in " << end_time - start_time << " seconds" << std::endl;
     // 結果の保存
     simulation.saveResults(num_time_step, filename);
-    std::cout << "rank: " << rank << " Simulation completed. Results saved to results.csv" << std::endl;
+    std::cout << "rank: " << rank << " Simulation completed." << std::endl;
 
 
     // MPIの終了

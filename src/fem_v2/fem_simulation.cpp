@@ -8,6 +8,7 @@
 
 #include "fem_simulation.hpp"
 
+
 // vectorのポインタ
 double *ef_x_ptr_;
 double *ef_y_ptr_;
@@ -67,6 +68,8 @@ double *send_buf_z_line_2_ptr_;
 double *recv_buf_z_line_2_ptr_;
 double *send_buf_z_line_3_ptr_;
 double *recv_buf_z_line_3_ptr_;
+int *outer_elems_ptr_;
+
 
 #pragma acc routine seq
 double source_function(double t, double permeability, double domain_size)
@@ -79,6 +82,7 @@ double source_function(double t, double permeability, double domain_size)
     return 2.0 * zeta * (2.0 * zeta * delay * delay - 1.0) *
            std::exp(0.0 - zeta * delay * delay) * 0.001; // ヘルツダイポールのdl = 0.001
 };
+
 
 FemSimulation::FemSimulation(const std::array<int, 3> &grid_size, double domain_size,
                              double time_step, double permittivity, double permeability,
@@ -153,17 +157,19 @@ FemSimulation::FemSimulation(const std::array<int, 3> &grid_size, double domain_
     calculateElementStiffnessMatrix();
 }
 
+
 void FemSimulation::initializeMesh()
 {
     int idx;
     int idx_element;
+    int count = 0;
 
-    electric_field_x_.resize(3ull * static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
-    electric_field_y_.resize(3ull * static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
-    electric_field_z_.resize(3ull * static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
-    connectivity_x_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) * 4, 0);
-    connectivity_y_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) * 4, 0);
-    connectivity_z_.resize(static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) * 4, 0);
+    electric_field_x_.resize(3 * static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    electric_field_y_.resize(3 * static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
+    electric_field_z_.resize(3 * static_cast<size_t>(grid_size_x_ + 1) * static_cast<size_t>(grid_size_y_ + 1) * static_cast<size_t>(grid_size_z_), 0.0);
+    connectivity_x_.resize(4 * static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_), 0);
+    connectivity_y_.resize(4 * static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_), 0);
+    connectivity_z_.resize(4 * static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_), 0);
     send_buf_x_plane_0_y_.resize(static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
     recv_buf_x_plane_0_y_.resize(static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
     send_buf_x_plane_1_y_.resize(static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_ + 1), 0.0);
@@ -212,6 +218,9 @@ void FemSimulation::initializeMesh()
     recv_buf_z_line_2_.resize(static_cast<size_t>(grid_size_z_), 0.0);
     send_buf_z_line_3_.resize(static_cast<size_t>(grid_size_z_), 0.0);
     recv_buf_z_line_3_.resize(static_cast<size_t>(grid_size_z_), 0.0);
+    outer_elems_.resize(2 * (static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_)
+     + static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) + static_cast<size_t>(grid_size_z_) * static_cast<size_t>(grid_size_x_))
+     - 4 * (static_cast<size_t>(grid_size_x_) + static_cast<size_t>(grid_size_y_) + static_cast<size_t>(grid_size_z_)) + 8, 0);
     
     ef_x_ptr_ = electric_field_x_.data();
     ef_y_ptr_ = electric_field_y_.data();
@@ -267,6 +276,7 @@ void FemSimulation::initializeMesh()
     recv_buf_z_line_2_ptr_ = recv_buf_z_line_2_.data();
     send_buf_z_line_3_ptr_ = send_buf_z_line_3_.data();
     recv_buf_z_line_3_ptr_ = recv_buf_z_line_3_.data();
+    outer_elems_ptr_ = outer_elems_.data();
 
     ENx = electric_field_x_.size();
     ENy = electric_field_y_.size();
@@ -298,6 +308,7 @@ void FemSimulation::initializeMesh()
     BLz1 = send_buf_z_line_1_.size();
     BLz2 = send_buf_z_line_2_.size();
     BLz3 = send_buf_z_line_3_.size();
+    OE = outer_elems_.size();
 
 #pragma acc data copyin(ef_x_ptr_[0 : ENx])
 #pragma acc data copyin(ef_y_ptr_[0 : ENy])
@@ -353,6 +364,7 @@ void FemSimulation::initializeMesh()
 #pragma acc data copyin(recv_buf_z_line_2_ptr_[0 : BLz2])
 #pragma acc data copyin(send_buf_z_line_3_ptr_[0 : BLz3])
 #pragma acc data copyin(recv_buf_z_line_3_ptr_[0 : BLz3])
+#pragma acc data copyin(outer_elems_ptr_[0 : OE])
 
 #pragma acc parallel loop collapse(3) private(idx, idx_element)
     for (int k = 0; k < grid_size_z_; ++k)
@@ -379,7 +391,40 @@ void FemSimulation::initializeMesh()
             }
         }
     }
+#pragma acc parallel loop collapse(2)
+    for (int j = 0; j < grid_size_y_; ++j)
+    {
+        for (int i = 0; i < grid_size_x_; ++i)
+        {
+            outer_elems_ptr_[i + j * grid_size_x_] = i + j * grid_size_x_;
+            outer_elems_ptr_[grid_size_x_ * grid_size_y_ + i + j * grid_size_x_] =
+                grid_size_x_ * grid_size_y_ * (grid_size_z_ - 1) + i + j * grid_size_x_;
+        }
+    }
+#pragma acc parallel loop collapse(2)
+    for (int k = 1; k < grid_size_z_ - 1; ++k)
+    {
+        for (int j = 0; j < grid_size_y_; ++j)
+        {
+            outer_elems_ptr_[2 * grid_size_x_ * grid_size_y_ + j + (k - 1) * grid_size_y_] =
+                j * grid_size_x_ + k * grid_size_x_ * grid_size_y_;
+            outer_elems_ptr_[2 * grid_size_x_ * grid_size_y_ + grid_size_y_ * (grid_size_z_ - 2) + j + (k - 1) * grid_size_y_] =
+                (grid_size_x_ - 1) + j * grid_size_x_ + k * grid_size_x_ * grid_size_y_;
+        }
+    }
+#pragma acc parallel loop collapse(2)
+    for (int i = 1; i < grid_size_x_ - 1; ++i)
+    {
+        for (int k = 1; k < grid_size_z_ - 1; ++k)
+        {
+            outer_elems_ptr_[2 * grid_size_x_ * grid_size_y_ + 2 * grid_size_y_ * (grid_size_z_ - 2) + k - 1 + (i - 1) * (grid_size_z_ - 2)] =
+                i + k * grid_size_x_ * grid_size_y_;
+            outer_elems_ptr_[2 * grid_size_x_ * grid_size_y_ + 2 * grid_size_y_ * (grid_size_z_ - 2) + (grid_size_z_ - 2) * (grid_size_x_ - 2) + k - 1 + (i - 1) * (grid_size_z_ - 2)] =
+                grid_size_x_ * (grid_size_y_ - 1) + i + k * grid_size_x_ * grid_size_y_;
+        }
+    }
 }
+
 
 void FemSimulation::calculateElementStiffnessMatrix()
 {
@@ -433,6 +478,7 @@ void FemSimulation::calculateElementStiffnessMatrix()
 #pragma acc data copyin(element_stiffness_matrix_)
 }
 
+
 void FemSimulation::setSource_x(const std::array<int, 3> &position)
 {
     if (position[0] >= grid_size_x_*coord_x_ && position[0] <= grid_size_x_*(coord_x_+1) &&
@@ -443,6 +489,7 @@ void FemSimulation::setSource_x(const std::array<int, 3> &position)
                                      (position[2] - grid_size_z_*coord_z_) * grid_size_x_ * grid_size_y_);
     }
 }
+
 
 void FemSimulation::setSource_y(const std::array<int, 3> &position)
 {
@@ -455,6 +502,7 @@ void FemSimulation::setSource_y(const std::array<int, 3> &position)
     }
 }
 
+
 void FemSimulation::setSource_z(const std::array<int, 3> &position)
 {
     if (position[0] >= grid_size_x_*coord_x_ && position[0] <= grid_size_x_*(coord_x_+1) &&
@@ -466,6 +514,7 @@ void FemSimulation::setSource_z(const std::array<int, 3> &position)
     }
 }
 
+
 void FemSimulation::setObservationPoint(const std::array<int, 3> &position)
 {
     if (position[0] >= grid_size_x_*coord_x_ && position[0] <= grid_size_x_*(coord_x_+1) &&
@@ -474,12 +523,19 @@ void FemSimulation::setObservationPoint(const std::array<int, 3> &position)
     {
         observation_points_.push_back(position[0] - grid_size_x_*coord_x_ + (position[1] - grid_size_y_*coord_y_) * grid_size_x_ +
                                     (position[2] - grid_size_z_*coord_z_) * grid_size_x_ * grid_size_y_);
-        saved_electric_field_.push_back(std::vector<std::array<double, 3>>());
+        saved_electric_field_.push_back(std::vector<std::array<double, 4>>());
     }
 }
 
+
 void FemSimulation::updateTimeStep()
 {
+    int idx;
+    double temp;
+    int l, m, n;
+
+
+    // 初期化
     ef_x_idx_0_ = time_0_ * grid_size_x_ * (grid_size_y_ + 1) * (grid_size_z_ + 1);
     ef_x_idx_1_ = time_1_ * grid_size_x_ * (grid_size_y_ + 1) * (grid_size_z_ + 1);
     ef_x_idx_2_ = time_2_ * grid_size_x_ * (grid_size_y_ + 1) * (grid_size_z_ + 1);
@@ -489,7 +545,6 @@ void FemSimulation::updateTimeStep()
     ef_z_idx_0_ = time_0_ * (grid_size_x_ + 1) * (grid_size_y_ + 1) * grid_size_z_;
     ef_z_idx_1_ = time_1_ * (grid_size_x_ + 1) * (grid_size_y_ + 1) * grid_size_z_;
     ef_z_idx_2_ = time_2_ * (grid_size_x_ + 1) * (grid_size_y_ + 1) * grid_size_z_;
-
 #pragma acc parallel loop
     for (int i = ef_x_idx_2_; i < ef_x_idx_2_ + grid_size_x_ * (grid_size_y_ + 1) * (grid_size_z_ + 1); ++i)
     {
@@ -505,18 +560,86 @@ void FemSimulation::updateTimeStep()
     {
         ef_z_ptr_[i] = 0.0;
     }
-    int idx;
-    double temp, temp_x, temp_y, temp_z;
-    int l, m, n, n_x, n_y, n_z;
 
 
-    // 要素ごとの剛性行列の計算
-#pragma acc parallel loop private(idx, ef_0_, temp, temp_x, temp_y, temp_z, l, m, n, n_x, n_y, n_z) collapse(3)
-    for (int k = 0; k < grid_size_z_; ++k)
+    // 要素ごとの剛性行列の計算(外側要素のみ)
+#pragma acc parallel loop private(idx, ef_0_, temp, l, m, n)
+    for (int i = 0; i < OE; ++i)
     {
-        for (int j = 0; j < grid_size_y_; ++j)
+        int idx = outer_elems_ptr_[i] * 4;
+        ef_0_ = {
+            ef_x_ptr_[ef_x_idx_1_ + conn_x_ptr_[idx + 0]],
+            ef_x_ptr_[ef_x_idx_1_ + conn_x_ptr_[idx + 1]],
+            ef_x_ptr_[ef_x_idx_1_ + conn_x_ptr_[idx + 2]],
+            ef_x_ptr_[ef_x_idx_1_ + conn_x_ptr_[idx + 3]],
+            ef_y_ptr_[ef_y_idx_1_ + conn_y_ptr_[idx + 0]],
+            ef_y_ptr_[ef_y_idx_1_ + conn_y_ptr_[idx + 1]],
+            ef_y_ptr_[ef_y_idx_1_ + conn_y_ptr_[idx + 2]],
+            ef_y_ptr_[ef_y_idx_1_ + conn_y_ptr_[idx + 3]],
+            ef_z_ptr_[ef_z_idx_1_ + conn_z_ptr_[idx + 0]],
+            ef_z_ptr_[ef_z_idx_1_ + conn_z_ptr_[idx + 1]],
+            ef_z_ptr_[ef_z_idx_1_ + conn_z_ptr_[idx + 2]],
+            ef_z_ptr_[ef_z_idx_1_ + conn_z_ptr_[idx + 3]],
+        };
+
+#pragma acc loop seq
+        for (l = 0; l < 4; ++l)
         {
-            for (int i = 0; i < grid_size_x_; ++i)
+            temp = 0;
+#pragma acc loop seq
+            for (m = 0; m < 12; ++m)
+            {
+                temp += element_stiffness_matrix_[l][m] * ef_0_[m];
+            }
+            n = ef_x_idx_2_ + conn_x_ptr_[idx + l];
+#pragma acc atomic update
+            ef_x_ptr_[n] -= temp;
+        }
+
+#pragma acc loop seq
+        for (l = 4; l < 8; ++l)
+        {
+            temp = 0;
+#pragma acc loop seq
+            for (m = 0; m < 12; ++m)
+            {
+                temp += element_stiffness_matrix_[l][m] * ef_0_[m];
+            }
+            n = ef_y_idx_2_ + conn_y_ptr_[idx + l - 4];
+#pragma acc atomic update
+            ef_y_ptr_[n] -= temp;
+        }
+
+#pragma acc loop seq
+        for (l = 8; l < 12; ++l)
+        {
+            temp = 0;
+#pragma acc loop seq
+            for (m = 0; m < 12; ++m)
+            {
+                temp += element_stiffness_matrix_[l][m] * ef_0_[m];
+            }
+            n = ef_z_idx_2_ + conn_z_ptr_[idx + l - 8];
+#pragma acc atomic update
+            ef_z_ptr_[n] -= temp;
+        }
+    }
+
+
+    // MPI通信
+    start_communication_time_ = MPI_Wtime();
+    startExchangeElectricField();
+    end_communication_time_ = MPI_Wtime();
+    total_communication_time_ += end_communication_time_ - start_communication_time_;
+
+
+    // 要素ごとの剛性行列の計算(内側要素のみ)
+#pragma acc parallel loop private(idx, ef_0_, temp, l, m, n) collapse(3)
+    for (int k = 1; k < grid_size_z_ - 1; ++k)
+    {
+        for (int j = 1; j < grid_size_y_ - 1; ++j)
+        {
+            for (int i = 1; i < grid_size_x_ - 1; ++i)
             {
                 idx = (i + j * grid_size_x_ + k * grid_size_x_ * grid_size_y_) * 4;
                 ef_0_ = {
@@ -580,9 +703,9 @@ void FemSimulation::updateTimeStep()
     }
 
 
-    // MPI通信
+    // MPI通信完了待ち
     start_communication_time_ = MPI_Wtime();
-    exchangeElectricField();
+    finishExchangeElectricField();
     end_communication_time_ = MPI_Wtime();
     total_communication_time_ += end_communication_time_ - start_communication_time_;
 
@@ -638,7 +761,7 @@ void FemSimulation::updateTimeStep()
 }
 
 
-void FemSimulation::exchangeElectricField()
+void FemSimulation::startExchangeElectricField()
 {
     MPI_Comm comm_0_, comm_1_, comm_2_, comm_3_;
 
@@ -659,24 +782,13 @@ void FemSimulation::exchangeElectricField()
     {
         if (coord_x_ != 0)
         {
-            MPI_Allreduce(send_buf_x_plane_0_y_ptr_, recv_buf_x_plane_0_y_ptr_,
-                        BNx0y, MPI_DOUBLE, MPI_SUM, comm_0_);
+            MPI_Iallreduce(send_buf_x_plane_0_y_ptr_, recv_buf_x_plane_0_y_ptr_,
+                        BNx0y, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[0]);
         }
         if (coord_x_ != dim_x_ - 1)
         {
-            MPI_Allreduce(send_buf_x_plane_1_y_ptr_, recv_buf_x_plane_1_y_ptr_,
-                        BNx1y, MPI_DOUBLE, MPI_SUM, comm_1_);
-        }
-    }
-#pragma acc parallel loop collapse(2)
-    for (int i = 0; i < grid_size_y_; ++i)
-    {
-        for (int j = 1; j < grid_size_z_; ++j)
-        {
-            ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * grid_size_y_] =
-                recv_buf_x_plane_0_y_ptr_[i + grid_size_y_ * j];
-            ef_y_ptr_[ef_y_idx_2_ + grid_size_x_ + i * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * grid_size_y_] =
-                recv_buf_x_plane_1_y_ptr_[i + grid_size_y_ * j];
+            MPI_Iallreduce(send_buf_x_plane_1_y_ptr_, recv_buf_x_plane_1_y_ptr_,
+                        BNx1y, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[1]);
         }
     }
 #pragma acc parallel loop collapse(2)
@@ -694,24 +806,13 @@ void FemSimulation::exchangeElectricField()
     {
         if (coord_x_ != 0)
         {
-            MPI_Allreduce(send_buf_x_plane_0_z_ptr_, recv_buf_x_plane_0_z_ptr_,
-                        BNx0z, MPI_DOUBLE, MPI_SUM, comm_0_);
+            MPI_Iallreduce(send_buf_x_plane_0_z_ptr_, recv_buf_x_plane_0_z_ptr_,
+                        BNx0z, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[2]);
         }
         if (coord_x_ != dim_x_ - 1)
         {
-            MPI_Allreduce(send_buf_x_plane_1_z_ptr_, recv_buf_x_plane_1_z_ptr_,
-                        BNx1z, MPI_DOUBLE, MPI_SUM, comm_1_);
-        }
-    }
-#pragma acc parallel loop collapse(2)
-    for (int i = 1; i < grid_size_y_; ++i)
-    {
-        for (int j = 0; j < grid_size_z_; ++j)
-        {
-            ef_z_ptr_[ef_z_idx_2_ + i * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * (grid_size_y_ + 1)] =
-                recv_buf_x_plane_0_z_ptr_[i + (grid_size_y_ + 1) * j];
-            ef_z_ptr_[ef_z_idx_2_ + grid_size_x_ + i * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * (grid_size_y_ + 1)] =
-                recv_buf_x_plane_1_z_ptr_[i + (grid_size_y_ + 1) * j];
+            MPI_Iallreduce(send_buf_x_plane_1_z_ptr_, recv_buf_x_plane_1_z_ptr_,
+                        BNx1z, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[3]);
         }
     }
 
@@ -733,24 +834,13 @@ void FemSimulation::exchangeElectricField()
     {
         if (coord_y_ != 0)
         {
-            MPI_Allreduce(send_buf_y_plane_0_z_ptr_, recv_buf_y_plane_0_z_ptr_,
-                        BNy0z, MPI_DOUBLE, MPI_SUM, comm_0_);
+            MPI_Iallreduce(send_buf_y_plane_0_z_ptr_, recv_buf_y_plane_0_z_ptr_,
+                        BNy0z, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[4]);
         }
         if (coord_y_ != dim_y_ - 1)
         {
-            MPI_Allreduce(send_buf_y_plane_1_z_ptr_, recv_buf_y_plane_1_z_ptr_,
-                        BNy1z, MPI_DOUBLE, MPI_SUM, comm_1_);
-        }
-    }
-#pragma acc parallel loop collapse(2)
-    for (int i = 1; i < grid_size_x_; ++i)
-    {
-        for (int j = 0; j < grid_size_z_; ++j)
-        {
-            ef_z_ptr_[ef_z_idx_2_ + i + j * (grid_size_x_ + 1) * (grid_size_y_ + 1)] =
-                recv_buf_y_plane_0_z_ptr_[i + (grid_size_x_ + 1) * j];
-            ef_z_ptr_[ef_z_idx_2_ + i + grid_size_y_ * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * (grid_size_y_ + 1)] =
-                recv_buf_y_plane_1_z_ptr_[i + (grid_size_x_ + 1) * j];
+            MPI_Iallreduce(send_buf_y_plane_1_z_ptr_, recv_buf_y_plane_1_z_ptr_,
+                        BNy1z, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[5]);
         }
     }
 #pragma acc parallel loop collapse(2)
@@ -768,24 +858,13 @@ void FemSimulation::exchangeElectricField()
     {
         if (coord_y_ != 0)
         {
-            MPI_Allreduce(send_buf_y_plane_0_x_ptr_, recv_buf_y_plane_0_x_ptr_,
-                        BNy0x, MPI_DOUBLE, MPI_SUM, comm_0_);
+            MPI_Iallreduce(send_buf_y_plane_0_x_ptr_, recv_buf_y_plane_0_x_ptr_,
+                        BNy0x, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[6]);
         }
         if (coord_y_ != dim_y_ - 1)
         {
-            MPI_Allreduce(send_buf_y_plane_1_x_ptr_, recv_buf_y_plane_1_x_ptr_,
-                        BNy1x, MPI_DOUBLE, MPI_SUM, comm_1_);
-        }
-    }
-#pragma acc parallel loop collapse(2)
-    for (int i = 0; i < grid_size_x_; ++i)
-    {
-        for (int j = 1; j < grid_size_z_; ++j)
-        {
-            ef_x_ptr_[ef_x_idx_2_ + i + j * grid_size_x_ * (grid_size_y_ + 1)] =
-                recv_buf_y_plane_0_x_ptr_[i + grid_size_x_ * j];
-            ef_x_ptr_[ef_x_idx_2_ + i + grid_size_y_ * grid_size_x_ + j * grid_size_x_ * (grid_size_y_ + 1)] =
-                recv_buf_y_plane_1_x_ptr_[i + grid_size_x_ * j];
+            MPI_Iallreduce(send_buf_y_plane_1_x_ptr_, recv_buf_y_plane_1_x_ptr_,
+                        BNy1x, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[7]);
         }
     }
 
@@ -807,24 +886,13 @@ void FemSimulation::exchangeElectricField()
     {
         if (coord_z_ != 0)
         {
-            MPI_Allreduce(send_buf_z_plane_0_x_ptr_, recv_buf_z_plane_0_x_ptr_,
-                          BNz0x, MPI_DOUBLE, MPI_SUM, comm_0_);
+            MPI_Iallreduce(send_buf_z_plane_0_x_ptr_, recv_buf_z_plane_0_x_ptr_,
+                          BNz0x, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[8]);
         }
         if (coord_z_ != dim_z_ - 1)
         {
-            MPI_Allreduce(send_buf_z_plane_1_x_ptr_, recv_buf_z_plane_1_x_ptr_,
-                          BNz1x, MPI_DOUBLE, MPI_SUM, comm_1_);
-        }
-    }
-#pragma acc parallel loop collapse(2)
-    for (int i = 0; i < grid_size_x_; ++i)
-    {
-        for (int j = 1; j < grid_size_y_; ++j)
-        {
-            ef_x_ptr_[ef_x_idx_2_ + i + j * grid_size_x_] =
-                recv_buf_z_plane_0_x_ptr_[i + grid_size_x_ * j];
-            ef_x_ptr_[ef_x_idx_2_ + i + j * grid_size_x_ + grid_size_x_ * (grid_size_y_ + 1) * grid_size_z_] =
-                recv_buf_z_plane_1_x_ptr_[i + grid_size_x_ * j];
+            MPI_Iallreduce(send_buf_z_plane_1_x_ptr_, recv_buf_z_plane_1_x_ptr_,
+                          BNz1x, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[9]);
         }
     }
 #pragma acc parallel loop collapse(2)
@@ -842,24 +910,13 @@ void FemSimulation::exchangeElectricField()
     {
         if (coord_z_ != 0)
         {
-            MPI_Allreduce(send_buf_z_plane_0_y_ptr_, recv_buf_z_plane_0_y_ptr_,
-                          BNz0y, MPI_DOUBLE, MPI_SUM, comm_0_);
+            MPI_Iallreduce(send_buf_z_plane_0_y_ptr_, recv_buf_z_plane_0_y_ptr_,
+                          BNz0y, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[10]);
         }
         if (coord_z_ != dim_z_ - 1)
         {
-            MPI_Allreduce(send_buf_z_plane_1_y_ptr_, recv_buf_z_plane_1_y_ptr_,
-                          BNz1y, MPI_DOUBLE, MPI_SUM, comm_1_);
-        }
-    }
-#pragma acc parallel loop collapse(2)
-    for (int i = 1; i < grid_size_x_; ++i)
-    {
-        for (int j = 0; j < grid_size_y_; ++j)
-        {
-            ef_y_ptr_[ef_y_idx_2_ + i + j * (grid_size_x_ + 1)] =
-                recv_buf_z_plane_0_y_ptr_[i + (grid_size_x_ + 1) * j];
-            ef_y_ptr_[ef_y_idx_2_ + i + j * (grid_size_x_ + 1) + (grid_size_x_ + 1) * grid_size_y_ * grid_size_z_] =
-                recv_buf_z_plane_1_y_ptr_[i + (grid_size_x_ + 1) * j];
+            MPI_Iallreduce(send_buf_z_plane_1_y_ptr_, recv_buf_z_plane_1_y_ptr_,
+                          BNz1y, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[11]);
         }
     }
 
@@ -908,36 +965,24 @@ void FemSimulation::exchangeElectricField()
     {
         if (coord_y_ != 0 && coord_z_ != 0)
         {
-            MPI_Allreduce(send_buf_x_line_0_ptr_, recv_buf_x_line_0_ptr_,
-                          BLx0, MPI_DOUBLE, MPI_SUM, comm_0_);
+            MPI_Iallreduce(send_buf_x_line_0_ptr_, recv_buf_x_line_0_ptr_,
+                          BLx0, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[12]);
         }
         if (coord_y_ != dim_y_ - 1 && coord_z_ != 0)
         {
-            MPI_Allreduce(send_buf_x_line_1_ptr_, recv_buf_x_line_1_ptr_,
-                          BLx1, MPI_DOUBLE, MPI_SUM, comm_1_);
+            MPI_Iallreduce(send_buf_x_line_1_ptr_, recv_buf_x_line_1_ptr_,
+                          BLx1, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[13]);
         }
         if (coord_y_ != 0 && coord_z_ != dim_z_ - 1)
         {
-            MPI_Allreduce(send_buf_x_line_2_ptr_, recv_buf_x_line_2_ptr_,
-                          BLx2, MPI_DOUBLE, MPI_SUM, comm_2_);
+            MPI_Iallreduce(send_buf_x_line_2_ptr_, recv_buf_x_line_2_ptr_,
+                          BLx2, MPI_DOUBLE, MPI_SUM, comm_2_, &reqs_[14]);
         }
         if (coord_y_ != dim_y_ - 1 && coord_z_ != dim_z_ - 1)
         {
-            MPI_Allreduce(send_buf_x_line_3_ptr_, recv_buf_x_line_3_ptr_,
-                          BLx3, MPI_DOUBLE, MPI_SUM, comm_3_);
+            MPI_Iallreduce(send_buf_x_line_3_ptr_, recv_buf_x_line_3_ptr_,
+                          BLx3, MPI_DOUBLE, MPI_SUM, comm_3_, &reqs_[15]);
         }
-    }
-#pragma acc parallel loop
-    for (int i = 0; i < grid_size_x_; ++i)
-    {
-        ef_x_ptr_[ef_x_idx_2_ + i] =
-            recv_buf_x_line_0_ptr_[i];
-        ef_x_ptr_[ef_x_idx_2_ + i + grid_size_x_ * grid_size_y_] =
-            recv_buf_x_line_1_ptr_[i];
-        ef_x_ptr_[ef_x_idx_2_ + i + grid_size_x_ * (grid_size_y_ + 1) * grid_size_z_] =
-            recv_buf_x_line_2_ptr_[i];
-        ef_x_ptr_[ef_x_idx_2_ + i + grid_size_x_ * (grid_size_y_ + 1) * grid_size_z_ + grid_size_x_ * grid_size_y_] =
-            recv_buf_x_line_3_ptr_[i];
     }
 
 
@@ -985,36 +1030,24 @@ void FemSimulation::exchangeElectricField()
     {
         if (coord_z_ != 0 && coord_x_ != 0)
         {
-            MPI_Allreduce(send_buf_y_line_0_ptr_, recv_buf_y_line_0_ptr_,
-                          BLy0, MPI_DOUBLE, MPI_SUM, comm_0_);
+            MPI_Iallreduce(send_buf_y_line_0_ptr_, recv_buf_y_line_0_ptr_,
+                          BLy0, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[16]);
         }
         if (coord_z_ != dim_z_ - 1 && coord_x_ != 0)
         {
-            MPI_Allreduce(send_buf_y_line_1_ptr_, recv_buf_y_line_1_ptr_,
-                          BLy1, MPI_DOUBLE, MPI_SUM, comm_1_);
+            MPI_Iallreduce(send_buf_y_line_1_ptr_, recv_buf_y_line_1_ptr_,
+                          BLy1, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[17]);
         }
         if (coord_z_ != 0 && coord_x_ != dim_x_ - 1)
         {
-            MPI_Allreduce(send_buf_y_line_2_ptr_, recv_buf_y_line_2_ptr_,
-                          BLy2, MPI_DOUBLE, MPI_SUM, comm_2_);
+            MPI_Iallreduce(send_buf_y_line_2_ptr_, recv_buf_y_line_2_ptr_,
+                          BLy2, MPI_DOUBLE, MPI_SUM, comm_2_, &reqs_[18]);
         }
         if (coord_z_ != dim_z_ - 1 && coord_x_ != dim_x_ - 1)
         {
-            MPI_Allreduce(send_buf_y_line_3_ptr_, recv_buf_y_line_3_ptr_,
-                          BLy3, MPI_DOUBLE, MPI_SUM, comm_3_);
+            MPI_Iallreduce(send_buf_y_line_3_ptr_, recv_buf_y_line_3_ptr_,
+                          BLy3, MPI_DOUBLE, MPI_SUM, comm_3_, &reqs_[19]);
         }
-    }
-#pragma acc parallel loop
-    for (int i = 0; i < grid_size_y_; ++i)
-    {
-        ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1)] =
-            recv_buf_y_line_0_ptr_[i];
-        ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1) + (grid_size_x_ + 1) * grid_size_y_ * grid_size_z_] =
-            recv_buf_y_line_1_ptr_[i];
-        ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1) + grid_size_x_] =
-            recv_buf_y_line_2_ptr_[i];
-        ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1) + (grid_size_x_ + 1) * grid_size_y_ * grid_size_z_ + grid_size_x_] =
-            recv_buf_y_line_3_ptr_[i];
     }
 
 
@@ -1062,24 +1095,121 @@ void FemSimulation::exchangeElectricField()
     {
         if (coord_x_ != 0 && coord_y_ != 0)
         {
-            MPI_Allreduce(send_buf_z_line_0_ptr_, recv_buf_z_line_0_ptr_,
-                          BLz0, MPI_DOUBLE, MPI_SUM, comm_0_);
+            MPI_Iallreduce(send_buf_z_line_0_ptr_, recv_buf_z_line_0_ptr_,
+                          BLz0, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[20]);
         }
         if (coord_x_ != dim_x_ - 1 && coord_y_ != 0)
         {
-            MPI_Allreduce(send_buf_z_line_1_ptr_, recv_buf_z_line_1_ptr_,
-                          BLz1, MPI_DOUBLE, MPI_SUM, comm_1_);
+            MPI_Iallreduce(send_buf_z_line_1_ptr_, recv_buf_z_line_1_ptr_,
+                          BLz1, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[21]);
         }
         if (coord_x_ != 0 && coord_y_ != dim_y_ - 1)
         {
-            MPI_Allreduce(send_buf_z_line_2_ptr_, recv_buf_z_line_2_ptr_,
-                          BLz2, MPI_DOUBLE, MPI_SUM, comm_2_);
+            MPI_Iallreduce(send_buf_z_line_2_ptr_, recv_buf_z_line_2_ptr_,
+                          BLz2, MPI_DOUBLE, MPI_SUM, comm_2_, &reqs_[22]);
         }
         if (coord_x_ != dim_x_ - 1 && coord_y_ != dim_y_ - 1)
         {
-            MPI_Allreduce(send_buf_z_line_3_ptr_, recv_buf_z_line_3_ptr_,
-                          BLz3, MPI_DOUBLE, MPI_SUM, comm_3_);
+            MPI_Iallreduce(send_buf_z_line_3_ptr_, recv_buf_z_line_3_ptr_,
+                          BLz3, MPI_DOUBLE, MPI_SUM, comm_3_, &reqs_[23]);
         }
+    }
+}
+
+
+void FemSimulation::finishExchangeElectricField()
+{
+    MPI_Waitall(24, reqs_, MPI_STATUSES_IGNORE);
+
+#pragma acc parallel loop collapse(2)
+    for (int i = 0; i < grid_size_y_; ++i)
+    {
+        for (int j = 1; j < grid_size_z_; ++j)
+        {
+            ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * grid_size_y_] =
+                recv_buf_x_plane_0_y_ptr_[i + grid_size_y_ * j];
+            ef_y_ptr_[ef_y_idx_2_ + grid_size_x_ + i * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * grid_size_y_] =
+                recv_buf_x_plane_1_y_ptr_[i + grid_size_y_ * j];
+        }
+    }
+#pragma acc parallel loop collapse(2)
+    for (int i = 1; i < grid_size_y_; ++i)
+    {
+        for (int j = 0; j < grid_size_z_; ++j)
+        {
+            ef_z_ptr_[ef_z_idx_2_ + i * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * (grid_size_y_ + 1)] =
+                recv_buf_x_plane_0_z_ptr_[i + (grid_size_y_ + 1) * j];
+            ef_z_ptr_[ef_z_idx_2_ + grid_size_x_ + i * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * (grid_size_y_ + 1)] =
+                recv_buf_x_plane_1_z_ptr_[i + (grid_size_y_ + 1) * j];
+        }
+    }
+#pragma acc parallel loop collapse(2)
+    for (int i = 1; i < grid_size_x_; ++i)
+    {
+        for (int j = 0; j < grid_size_z_; ++j)
+        {
+            ef_z_ptr_[ef_z_idx_2_ + i + j * (grid_size_x_ + 1) * (grid_size_y_ + 1)] =
+                recv_buf_y_plane_0_z_ptr_[i + (grid_size_x_ + 1) * j];
+            ef_z_ptr_[ef_z_idx_2_ + i + grid_size_y_ * (grid_size_x_ + 1) + j * (grid_size_x_ + 1) * (grid_size_y_ + 1)] =
+                recv_buf_y_plane_1_z_ptr_[i + (grid_size_x_ + 1) * j];
+        }
+    }
+#pragma acc parallel loop collapse(2)
+    for (int i = 0; i < grid_size_x_; ++i)
+    {
+        for (int j = 1; j < grid_size_z_; ++j)
+        {
+            ef_x_ptr_[ef_x_idx_2_ + i + j * grid_size_x_ * (grid_size_y_ + 1)] =
+                recv_buf_y_plane_0_x_ptr_[i + grid_size_x_ * j];
+            ef_x_ptr_[ef_x_idx_2_ + i + grid_size_y_ * grid_size_x_ + j * grid_size_x_ * (grid_size_y_ + 1)] =
+                recv_buf_y_plane_1_x_ptr_[i + grid_size_x_ * j];
+        }
+    }
+#pragma acc parallel loop collapse(2)
+    for (int i = 0; i < grid_size_x_; ++i)
+    {
+        for (int j = 1; j < grid_size_y_; ++j)
+        {
+            ef_x_ptr_[ef_x_idx_2_ + i + j * grid_size_x_] =
+                recv_buf_z_plane_0_x_ptr_[i + grid_size_x_ * j];
+            ef_x_ptr_[ef_x_idx_2_ + i + j * grid_size_x_ + grid_size_x_ * (grid_size_y_ + 1) * grid_size_z_] =
+                recv_buf_z_plane_1_x_ptr_[i + grid_size_x_ * j];
+        }
+    }
+#pragma acc parallel loop collapse(2)
+    for (int i = 1; i < grid_size_x_; ++i)
+    {
+        for (int j = 0; j < grid_size_y_; ++j)
+        {
+            ef_y_ptr_[ef_y_idx_2_ + i + j * (grid_size_x_ + 1)] =
+                recv_buf_z_plane_0_y_ptr_[i + (grid_size_x_ + 1) * j];
+            ef_y_ptr_[ef_y_idx_2_ + i + j * (grid_size_x_ + 1) + (grid_size_x_ + 1) * grid_size_y_ * grid_size_z_] =
+                recv_buf_z_plane_1_y_ptr_[i + (grid_size_x_ + 1) * j];
+        }
+    }
+#pragma acc parallel loop
+    for (int i = 0; i < grid_size_x_; ++i)
+    {
+        ef_x_ptr_[ef_x_idx_2_ + i] =
+            recv_buf_x_line_0_ptr_[i];
+        ef_x_ptr_[ef_x_idx_2_ + i + grid_size_x_ * grid_size_y_] =
+            recv_buf_x_line_1_ptr_[i];
+        ef_x_ptr_[ef_x_idx_2_ + i + grid_size_x_ * (grid_size_y_ + 1) * grid_size_z_] =
+            recv_buf_x_line_2_ptr_[i];
+        ef_x_ptr_[ef_x_idx_2_ + i + grid_size_x_ * (grid_size_y_ + 1) * grid_size_z_ + grid_size_x_ * grid_size_y_] =
+            recv_buf_x_line_3_ptr_[i];
+    }
+#pragma acc parallel loop
+    for (int i = 0; i < grid_size_y_; ++i)
+    {
+        ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1)] =
+            recv_buf_y_line_0_ptr_[i];
+        ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1) + (grid_size_x_ + 1) * grid_size_y_ * grid_size_z_] =
+            recv_buf_y_line_1_ptr_[i];
+        ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1) + grid_size_x_] =
+            recv_buf_y_line_2_ptr_[i];
+        ef_y_ptr_[ef_y_idx_2_ + i * (grid_size_x_ + 1) + (grid_size_x_ + 1) * grid_size_y_ * grid_size_z_ + grid_size_x_] =
+            recv_buf_y_line_3_ptr_[i];
     }
 #pragma acc parallel loop
     for (int i = 0; i < grid_size_z_; ++i)
@@ -1094,6 +1224,7 @@ void FemSimulation::exchangeElectricField()
             recv_buf_z_line_3_ptr_[i];
     }
 }
+
 
 void FemSimulation::applyBoundaryConditions()
 {
@@ -1229,12 +1360,13 @@ void FemSimulation::applyBoundaryConditions()
     }
 }
 
+
 void FemSimulation::run(int num_steps)
 {
     saved_electric_field_.resize(observation_points_.size());
     for (auto &point : saved_electric_field_)
     {
-        point.resize(static_cast<int>(std::round(num_steps / time_frequency_)) + 1);
+        point.resize(static_cast<int>(std::round((num_steps - 1) / time_frequency_)) + 1);
     }
     src_pos_x_ptr_ = source_position_x_.data();
     src_pos_y_ptr_ = source_position_y_.data();
@@ -1243,14 +1375,14 @@ void FemSimulation::run(int num_steps)
 #pragma acc data copyin(src_pos_y_ptr_[0 : source_position_y_.size()])
 #pragma acc data copyin(src_pos_z_ptr_[0 : source_position_z_.size()])
 
-    for (int step = 1; step < num_steps + 1; ++step)
+    for (int step = 0; step < num_steps; ++step)
     {
         if (step % 100 == 0)
         {
             std::cout << "rank: " << rank_ << " step: " << step << std::endl;
         }
         updateTimeStep();
-        // applyBoundaryConditions();
+        applyBoundaryConditions();
 
         // 観測点での値を保存
         if (step % time_frequency_ == 0)
@@ -1266,29 +1398,31 @@ void FemSimulation::run(int num_steps)
                 int conn_y_2 = conn_y_ptr_[4*observation_points_[i] - 4*grid_size_x_];
                 int conn_y_3 = conn_y_ptr_[4*observation_points_[i] - 4*grid_size_x_ + 1];
                 int conn_z_0 = conn_z_ptr_[4*observation_points_[i]];
-#pragma acc update host(ef_x_ptr_[ef_x_idx_2_ + conn_x_0])
-#pragma acc update host(ef_x_ptr_[ef_x_idx_2_ + conn_x_1])
-#pragma acc update host(ef_x_ptr_[ef_x_idx_2_ + conn_x_2])
-#pragma acc update host(ef_x_ptr_[ef_x_idx_2_ + conn_x_3])
-#pragma acc update host(ef_y_ptr_[ef_y_idx_2_ + conn_y_0])
-#pragma acc update host(ef_y_ptr_[ef_y_idx_2_ + conn_y_1])
-#pragma acc update host(ef_y_ptr_[ef_y_idx_2_ + conn_y_2])
-#pragma acc update host(ef_y_ptr_[ef_y_idx_2_ + conn_y_3])
-#pragma acc update host(ef_z_ptr_[ef_z_idx_2_ + conn_z_0])
+#pragma acc update host(ef_x_ptr_[ef_x_idx_1_ + conn_x_0])
+#pragma acc update host(ef_x_ptr_[ef_x_idx_1_ + conn_x_1])
+#pragma acc update host(ef_x_ptr_[ef_x_idx_1_ + conn_x_2])
+#pragma acc update host(ef_x_ptr_[ef_x_idx_1_ + conn_x_3])
+#pragma acc update host(ef_y_ptr_[ef_y_idx_1_ + conn_y_0])
+#pragma acc update host(ef_y_ptr_[ef_y_idx_1_ + conn_y_1])
+#pragma acc update host(ef_y_ptr_[ef_y_idx_1_ + conn_y_2])
+#pragma acc update host(ef_y_ptr_[ef_y_idx_1_ + conn_y_3])
+#pragma acc update host(ef_z_ptr_[ef_z_idx_1_ + conn_z_0])
                 saved_electric_field_[i][static_cast<int>(std::round(step / time_frequency_))][0] =
-                    (ef_x_ptr_[ef_x_idx_2_ + conn_x_0] +
-                     ef_x_ptr_[ef_x_idx_2_ + conn_x_1] +
-                     ef_x_ptr_[ef_x_idx_2_ + conn_x_2] +
-                     ef_x_ptr_[ef_x_idx_2_ + conn_x_3]) /
-                    4.0;
+                    current_time_;
                 saved_electric_field_[i][static_cast<int>(std::round(step / time_frequency_))][1] =
-                    (ef_y_ptr_[ef_y_idx_2_ + conn_y_0] +
-                     ef_y_ptr_[ef_y_idx_2_ + conn_y_1] +
-                     ef_y_ptr_[ef_y_idx_2_ + conn_y_2] +
-                     ef_y_ptr_[ef_y_idx_2_ + conn_y_3]) /
+                    (ef_x_ptr_[ef_x_idx_1_ + conn_x_0] +
+                     ef_x_ptr_[ef_x_idx_1_ + conn_x_1] +
+                     ef_x_ptr_[ef_x_idx_1_ + conn_x_2] +
+                     ef_x_ptr_[ef_x_idx_1_ + conn_x_3]) /
                     4.0;
                 saved_electric_field_[i][static_cast<int>(std::round(step / time_frequency_))][2] =
-                    ef_z_ptr_[ef_z_idx_2_ + conn_z_0];
+                    (ef_y_ptr_[ef_y_idx_1_ + conn_y_0] +
+                     ef_y_ptr_[ef_y_idx_1_ + conn_y_1] +
+                     ef_y_ptr_[ef_y_idx_1_ + conn_y_2] +
+                     ef_y_ptr_[ef_y_idx_1_ + conn_y_3]) /
+                    4.0;
+                saved_electric_field_[i][static_cast<int>(std::round(step / time_frequency_))][3] =
+                    ef_z_ptr_[ef_z_idx_1_ + conn_z_0];
             }
         }
         current_time_ += time_step_;
@@ -1298,6 +1432,7 @@ void FemSimulation::run(int num_steps)
     }
     std::cout << "rank: " << rank_ << " Total communication time: " << total_communication_time_ << " seconds" << std::endl;
 }
+
 
 void FemSimulation::saveResults(int num_steps, const std::string &filename)
 {
@@ -1314,13 +1449,15 @@ void FemSimulation::saveResults(int num_steps, const std::string &filename)
         file << "time,Ex,Ey,Ez" << std::endl;
         for (size_t j = 0; j < saved_electric_field_[i].size(); ++j)
         {
-            file << j * time_frequency_ * time_step_ << "," << saved_electric_field_[i][j][0] << ","
-                 << saved_electric_field_[i][j][1] << "," << saved_electric_field_[i][j][2]
+            file << saved_electric_field_[i][j][0] << "," << saved_electric_field_[i][j][1] << ","
+                 << saved_electric_field_[i][j][2] << "," << saved_electric_field_[i][j][3]
                  << std::endl;
         }
         file.close();
+        std::cout << "rank: " << rank_ << " Results saved to " << filename << std::endl;
     }
 }
+
 
 bool check_params(const std::array<double, 3> &domain_sizes, const std::array<int, 3> &grid_num, double duration,
                   double time_step, double domain_size, double c)
@@ -1356,6 +1493,7 @@ bool check_params(const std::array<double, 3> &domain_sizes, const std::array<in
     }
     return true;
 };
+
 
 std::string compress(double value)
 {

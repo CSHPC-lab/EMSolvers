@@ -132,6 +132,7 @@ private:
     std::vector<double> recv_buf_z_line_2_;
     std::vector<double> send_buf_z_line_3_;
     std::vector<double> recv_buf_z_line_3_;
+    std::vector<int> outer_elems_;
 
     // 要素数
     int ENx;
@@ -164,6 +165,7 @@ private:
     int BLz1;
     int BLz2;
     int BLz3;
+    int OE;
 
     // 外力の情報
     std::vector<int> source_position_x_;
@@ -199,15 +201,24 @@ private:
     void calculateElementStiffnessMatrix();
 
     // MPI通信
-    void exchangeElectricField();
+    void startExchangeElectricField();
+    void finishExchangeElectricField();
 
     // 保存する時系列計算結果
-    std::vector<std::vector<std::array<double, 3>>> saved_electric_field_;
+    std::vector<std::vector<std::array<double, 4>>> saved_electric_field_;
 
     // 時間計測
     double total_communication_time_ = 0.0;
     double start_communication_time_;
     double end_communication_time_;
+
+    // MPIリクエスト
+    MPI_Request reqs_[24] ={MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL,
+                            MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL,
+                            MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL,
+                            MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL,
+                            MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL,
+                            MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL};
 };
 
 bool check_params(const std::array<double, 3> &domain_sizes, const std::array<int, 3> &grid_num, double duration,
