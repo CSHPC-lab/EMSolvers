@@ -1,11 +1,11 @@
 #!/bin/bash -l
 
-#SBATCH --array=2,4,6,8,10,12
+#SBATCH --array=2,4,6,8,12,14%1
 #SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4
-#SBATCH --nodes=4
-#SBATCH --partition=80g
+#SBATCH --nodes=8
+#SBATCH --partition=all
 #SBATCH --time=24:00:00
 #SBATCH -o ./cpp_log/slurm.%j.out
 #SBATCH -e ./cpp_log/slurm.%j.err
@@ -18,12 +18,12 @@ use_ofem=$(( ( SLURM_ARRAY_TASK_ID - 1 ) % 2 ))
 domain_size="3.0"
 base_num=300
 duration="9.0e-9"
-source_position_x="1.30"
-observation_position_x="1.70"
-source_position_y="1.30"
-observation_position_y="1.70"
-source_position_z="1.30"
-observation_position_z="1.70"
+source_position_x="1.40"
+observation_position_x="1.60"
+source_position_y="1.40"
+observation_position_y="1.60"
+source_position_z="1.40"
+observation_position_z="1.60"
 distance_x=$(echo "$observation_position_x - $source_position_x" | bc -l)
 distance_x=$(printf "%.3f" "$distance_x")
 distance_y=$(echo "$observation_position_y - $source_position_y" | bc -l)
@@ -50,7 +50,7 @@ mpirun -np $processes \
     $EXECUTABLE $n $use_ofem $domain_size $domain_size $domain_size $base_num $duration $source_position_x $source_position_y $source_position_z $observation_position_x $observation_position_y $observation_position_z $dim_x $dim_y $dim_z
 
 make clean TARGET=$target
-DIR="/data3/kusumoto/EMSolvers/src/fem_v2/results/$distance"
+DIR="results/$distance"
 mkdir -p $DIR
 mv *.csv $DIR/
 echo "Execution completed."

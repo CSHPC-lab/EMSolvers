@@ -98,8 +98,8 @@ int main(int argc, char *argv[])
     observation_index[0] = static_cast<int>(std::round(observation_position_x / domain_size));
     observation_index[1] = static_cast<int>(std::round(observation_position_y / domain_size));
     observation_index[2] = static_cast<int>(std::round(observation_position_z / domain_size));
-    time_step = domain_size / (c * std::sqrt(3.0)) / 1.0;
-    time_frequency = scale * 1;
+    time_step = domain_size / (c * std::sqrt(3.0)) / 2.0;
+    time_frequency = scale * 2;
     num_time_step = static_cast<int>(std::floor(duration / time_step) + 1);
     if (use_ofem)
     {
