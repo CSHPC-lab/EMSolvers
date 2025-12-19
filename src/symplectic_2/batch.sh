@@ -1,12 +1,12 @@
 #!/bin/bash -l
 
-#SBATCH --array=2,4,6,8,12,14%1
+#SBATCH --array=1-10%1
 #SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4
 #SBATCH --nodes=8
 #SBATCH --partition=all
-#SBATCH --time=24:00:00
+#SBATCH --time=1:00:00
 #SBATCH -o ./cpp_log/slurm.%j.out
 #SBATCH -e ./cpp_log/slurm.%j.err
 

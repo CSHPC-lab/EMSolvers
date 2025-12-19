@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-#SBATCH --array=11-12%1
+#SBATCH --array=1-12%1
 #SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4
@@ -50,7 +50,7 @@ mpirun -np $processes \
     $EXECUTABLE $n $use_ofem $domain_size $domain_size $domain_size $base_num $duration $source_position_x $source_position_y $source_position_z $observation_position_x $observation_position_y $observation_position_z $dim_x $dim_y $dim_z
 
 make clean TARGET=$target
-DIR="/data3/kusumoto/EMSolvers/src/fem_v2/results/$distance"
+DIR="results/$distance"
 mkdir -p $DIR
 mv *.csv $DIR/
 echo "Execution completed."

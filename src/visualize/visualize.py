@@ -53,6 +53,10 @@ def plot_multiple_csv_files(directory='inputs'):
         ax.grid(True)
         ax.ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
         ax.legend(fontsize='small', loc='center left', bbox_to_anchor=(1, 0.5))
+        # ax.set_xlim(2.0e-9, 2.3e-9)
+        # ax.set_ylim(6.0e9, 8.3e9)
+        # ax.set_xlim(5.5e-9, 5.8e-9)
+        # ax.set_ylim(1.0e9, 2.1e9)
 
     axes[-1].set_xlabel('Time [s]')
     # fig.suptitle('Comparison of Electric Field Components', fontsize=14)

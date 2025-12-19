@@ -47,7 +47,6 @@ int main(int argc, char *argv[])
         size_z_line_0, size_z_line_1, size_z_line_2, size_z_line_3;
     int gpu_id, num_gpus;
 
-
     if (argc != 17)
     {
         std::cout << "Usage: mpirun -n <size> ./fem_simulation <scale> <use_ofem> <domain_size_x> <domain_size_y> <domain_size_z> <base_num> <duration> <source_position_x> <source_position_y> <source_position_z> <observation_position_x> <observation_position_y> <observation_position_z> <dim_x> <dim_y> <dim_z>" << std::endl;
@@ -63,9 +62,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-
     MPI_Init(&argc, &argv);
-
 
     // シミュレーションパラメータの設定
     scale = std::stoi(argv[1]);
@@ -103,15 +100,15 @@ int main(int argc, char *argv[])
     num_time_step = static_cast<int>(std::floor(duration / time_step) + 1);
     if (use_ofem)
     {
-        filename = "ofem_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) + 
-                     "_" + compress(source_position_x) + "_" + compress(source_position_y) + "_" + compress(source_position_z) +
-                     "_" + compress(observation_position_x) + "_" + compress(observation_position_y) + "_" + compress(observation_position_z) + ".csv";
+        filename = "symplectic4thofem_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
+                   "_" + compress(source_position_x) + "_" + compress(source_position_y) + "_" + compress(source_position_z) +
+                   "_" + compress(observation_position_x) + "_" + compress(observation_position_y) + "_" + compress(observation_position_z) + ".csv";
     }
     else
     {
-        filename = "fem_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) + 
-                     "_" + compress(source_position_x) + "_" + compress(source_position_y) + "_" + compress(source_position_z) +
-                     "_" + compress(observation_position_x) + "_" + compress(observation_position_y) + "_" + compress(observation_position_z) + ".csv";
+        filename = "symplectic4thfem_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
+                   "_" + compress(source_position_x) + "_" + compress(source_position_y) + "_" + compress(source_position_z) +
+                   "_" + compress(observation_position_x) + "_" + compress(observation_position_y) + "_" + compress(observation_position_z) + ".csv";
     }
     // パラメータのチェック
     if (!check_params(domain_sizes, grid_nums, duration, time_step, domain_size, c))
@@ -123,7 +120,6 @@ int main(int argc, char *argv[])
     dims[1] = dim_y;
     dims[2] = dim_z;
 
-    
     // MPIの初期化
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -202,9 +198,7 @@ int main(int argc, char *argv[])
     std::cout << "rank: " << rank << " comm_z_line_2 rank: " << rank_z_line_2 << ", size: " << size_z_line_2 << std::endl;
     std::cout << "rank: " << rank << " comm_z_line_3 rank: " << rank_z_line_3 << ", size: " << size_z_line_3 << std::endl;
 
-
     std::cout << "rank: " << rank << " OMP_NUM_THREADS = " << omp_get_max_threads() << std::endl;
-
 
     // GPUデバイスの確認
     num_gpus = acc_get_num_devices(acc_device_nvidia);
@@ -212,7 +206,6 @@ int main(int argc, char *argv[])
     acc_set_device_num(gpu_id, acc_device_nvidia);
     gpu_id = acc_get_device_num(acc_device_nvidia);
     std::cout << "rank: " << rank << " Using GPU device: " << gpu_id << " out of " << num_gpus << " available GPUs." << std::endl;
-
 
     // シミュレーション
     start_time = omp_get_wtime();
@@ -241,7 +234,6 @@ int main(int argc, char *argv[])
     // 結果の保存
     simulation.saveResults(num_time_step, filename);
     std::cout << "rank: " << rank << " Simulation completed." << std::endl;
-
 
     // MPIの終了
     MPI_Comm_free(&comm_x_plane_0);

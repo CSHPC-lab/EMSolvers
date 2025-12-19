@@ -8,7 +8,6 @@
 
 #include "fem_simulation.hpp"
 
-
 // vectorのポインタ
 double *ef_x_ptr_;
 double *ef_y_ptr_;
@@ -70,19 +69,17 @@ double *send_buf_z_line_3_ptr_;
 double *recv_buf_z_line_3_ptr_;
 int *outer_elems_ptr_;
 
-
 #pragma acc routine seq
 double source_function(double t, double permeability, double domain_size)
 {
     // ガウス関数の2階微分
-    const double freq = 1.0e9;               // 中心周波数 [Hz]
+    const double freq = 1.0e9;     // 中心周波数 [Hz]
     const double chi = 1.0 / freq; // 中心時間 [s]
     double delay = t - chi;
     double zeta = 2.0 * M_PI * M_PI * freq * freq;
     return 2.0 * zeta * (2.0 * zeta * delay * delay - 1.0) *
            std::exp(0.0 - zeta * delay * delay) * 0.001; // ヘルツダイポールのdl = 0.001
 };
-
 
 FemSimulation::FemSimulation(const std::array<int, 3> &grid_size, double domain_size,
                              double time_step, double permittivity, double permeability,
@@ -154,7 +151,6 @@ FemSimulation::FemSimulation(const std::array<int, 3> &grid_size, double domain_
     calculateElementStiffnessMatrix();
 }
 
-
 void FemSimulation::initializeMesh()
 {
     int idx;
@@ -215,10 +211,8 @@ void FemSimulation::initializeMesh()
     recv_buf_z_line_2_.resize(static_cast<size_t>(grid_size_z_), 0.0);
     send_buf_z_line_3_.resize(static_cast<size_t>(grid_size_z_), 0.0);
     recv_buf_z_line_3_.resize(static_cast<size_t>(grid_size_z_), 0.0);
-    outer_elems_.resize(2 * (static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_)
-     + static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) + static_cast<size_t>(grid_size_z_) * static_cast<size_t>(grid_size_x_))
-     - 4 * (static_cast<size_t>(grid_size_x_) + static_cast<size_t>(grid_size_y_) + static_cast<size_t>(grid_size_z_)) + 8, 0);
-    
+    outer_elems_.resize(2 * (static_cast<size_t>(grid_size_x_) * static_cast<size_t>(grid_size_y_) + static_cast<size_t>(grid_size_y_) * static_cast<size_t>(grid_size_z_) + static_cast<size_t>(grid_size_z_) * static_cast<size_t>(grid_size_x_)) - 4 * (static_cast<size_t>(grid_size_x_) + static_cast<size_t>(grid_size_y_) + static_cast<size_t>(grid_size_z_)) + 8, 0);
+
     ef_x_ptr_ = electric_field_x_.data();
     ef_y_ptr_ = electric_field_y_.data();
     ef_z_ptr_ = electric_field_z_.data();
@@ -422,39 +416,38 @@ void FemSimulation::initializeMesh()
     }
 }
 
-
 void FemSimulation::calculateElementStiffnessMatrix()
 {
     std::array<std::array<double, 12>, 12> Kmat = {
-        {{4.0/3.0, -1.0/3.0, -1.0/3.0, -2.0/3.0, -2.0/3.0, -1.0/3.0, 2.0/3.0, 1.0/3.0, -2.0/3.0, 2.0/3.0, -1.0/3.0, 1.0/3.0},
-        {-1.0/3.0, 4.0/3.0, -2.0/3.0, -1.0/3.0, 2.0/3.0, 1.0/3.0, -2.0/3.0, -1.0/3.0, -1.0/3.0, 1.0/3.0, -2.0/3.0, 2.0/3.0},
-        {-1.0/3.0, -2.0/3.0, 4.0/3.0, -1.0/3.0, -1.0/3.0, -2.0/3.0, 1.0/3.0, 2.0/3.0, 2.0/3.0, -2.0/3.0, 1.0/3.0, -1.0/3.0},
-        {-2.0/3.0, -1.0/3.0, -1.0/3.0, 4.0/3.0, 1.0/3.0, 2.0/3.0, -1.0/3.0, -2.0/3.0, 1.0/3.0, -1.0/3.0, 2.0/3.0, -2.0/3.0},
-        {-2.0/3.0, 2.0/3.0, -1.0/3.0, 1.0/3.0, 4.0/3.0, -1.0/3.0, -1.0/3.0, -2.0/3.0, -2.0/3.0, -1.0/3.0, 2.0/3.0, 1.0/3.0},
-        {-1.0/3.0, 1.0/3.0, -2.0/3.0, 2.0/3.0, -1.0/3.0, 4.0/3.0, -2.0/3.0, -1.0/3.0, 2.0/3.0, 1.0/3.0, -2.0/3.0, -1.0/3.0},
-        {2.0/3.0, -2.0/3.0, 1.0/3.0, -1.0/3.0, -1.0/3.0, -2.0/3.0, 4.0/3.0, -1.0/3.0, -1.0/3.0, -2.0/3.0, 1.0/3.0, 2.0/3.0},
-        {1.0/3.0, -1.0/3.0, 2.0/3.0, -2.0/3.0, -2.0/3.0, -1.0/3.0, -1.0/3.0, 4.0/3.0, 1.0/3.0, 2.0/3.0, -1.0/3.0, -2.0/3.0},
-        {-2.0/3.0, -1.0/3.0, 2.0/3.0, 1.0/3.0, -2.0/3.0, 2.0/3.0, -1.0/3.0, 1.0/3.0, 4.0/3.0, -1.0/3.0, -1.0/3.0, -2.0/3.0},
-        {2.0/3.0, 1.0/3.0, -2.0/3.0, -1.0/3.0, -1.0/3.0, 1.0/3.0, -2.0/3.0, 2.0/3.0, -1.0/3.0, 4.0/3.0, -2.0/3.0, -1.0/3.0},
-        {-1.0/3.0, -2.0/3.0, 1.0/3.0, 2.0/3.0, 2.0/3.0, -2.0/3.0, 1.0/3.0, -1.0/3.0, -1.0/3.0, -2.0/3.0, 4.0/3.0, -1.0/3.0},
-        {1.0/3.0, 2.0/3.0, -1.0/3.0, -2.0/3.0, 1.0/3.0, -1.0/3.0, 2.0/3.0, -2.0/3.0, -2.0/3.0, -1.0/3.0, -1.0/3.0, 4.0/3.0}}};
-    
+        {{4.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0, 2.0 / 3.0, 1.0 / 3.0, -2.0 / 3.0, 2.0 / 3.0, -1.0 / 3.0, 1.0 / 3.0},
+         {-1.0 / 3.0, 4.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0, 2.0 / 3.0, 1.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, 1.0 / 3.0, -2.0 / 3.0, 2.0 / 3.0},
+         {-1.0 / 3.0, -2.0 / 3.0, 4.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0, -2.0 / 3.0, 1.0 / 3.0, -1.0 / 3.0},
+         {-2.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, 4.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0, 1.0 / 3.0, -1.0 / 3.0, 2.0 / 3.0, -2.0 / 3.0},
+         {-2.0 / 3.0, 2.0 / 3.0, -1.0 / 3.0, 1.0 / 3.0, 4.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0, 2.0 / 3.0, 1.0 / 3.0},
+         {-1.0 / 3.0, 1.0 / 3.0, -2.0 / 3.0, 2.0 / 3.0, -1.0 / 3.0, 4.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0, 2.0 / 3.0, 1.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0},
+         {2.0 / 3.0, -2.0 / 3.0, 1.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0, 4.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0},
+         {1.0 / 3.0, -1.0 / 3.0, 2.0 / 3.0, -2.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, 4.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0},
+         {-2.0 / 3.0, -1.0 / 3.0, 2.0 / 3.0, 1.0 / 3.0, -2.0 / 3.0, 2.0 / 3.0, -1.0 / 3.0, 1.0 / 3.0, 4.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0},
+         {2.0 / 3.0, 1.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, 1.0 / 3.0, -2.0 / 3.0, 2.0 / 3.0, -1.0 / 3.0, 4.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0},
+         {-1.0 / 3.0, -2.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0, -2.0 / 3.0, 1.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0, 4.0 / 3.0, -1.0 / 3.0},
+         {1.0 / 3.0, 2.0 / 3.0, -1.0 / 3.0, -2.0 / 3.0, 1.0 / 3.0, -1.0 / 3.0, 2.0 / 3.0, -2.0 / 3.0, -2.0 / 3.0, -1.0 / 3.0, -1.0 / 3.0, 4.0 / 3.0}}};
+
     if (use_ofem_ == 1)
     {
         // OFEMの要素剛性行列
         Kmat = {
-            {{14.0/8.0, -6.0/8.0, -6.0/8.0, -2.0/8.0, -7.0/8.0, -1.0/8.0, 7.0/8.0, 1.0/8.0, -7.0/8.0, 7.0/8.0, -1.0/8.0, 1.0/8.0},
-            {-6.0/8.0, 14.0/8.0, -2.0/8.0, -6.0/8.0, 7.0/8.0, 1.0/8.0, -7.0/8.0, -1.0/8.0, -1.0/8.0, 1.0/8.0, -7.0/8.0, 7.0/8.0},
-            {-6.0/8.0, -2.0/8.0, 14.0/8.0, -6.0/8.0, -1.0/8.0, -7.0/8.0, 1.0/8.0, 7.0/8.0, 7.0/8.0, -7.0/8.0, 1.0/8.0, -1.0/8.0},
-            {-2.0/8.0, -6.0/8.0, -6.0/8.0, 14.0/8.0, 1.0/8.0, 7.0/8.0, -1.0/8.0, -7.0/8.0, 1.0/8.0, -1.0/8.0, 7.0/8.0, -7.0/8.0},
-            {-7.0/8.0, 7.0/8.0, -1.0/8.0, 1.0/8.0, 14.0/8.0, -6.0/8.0, -6.0/8.0, -2.0/8.0, -7.0/8.0, -1.0/8.0, 7.0/8.0, 1.0/8.0},
-            {-1.0/8.0, 1.0/8.0, -7.0/8.0, 7.0/8.0, -6.0/8.0, 14.0/8.0, -2.0/8.0, -6.0/8.0, 7.0/8.0, 1.0/8.0, -7.0/8.0, -1.0/8.0},
-            {7.0/8.0, -7.0/8.0, 1.0/8.0, -1.0/8.0, -6.0/8.0, -2.0/8.0, 14.0/8.0, -6.0/8.0, -1.0/8.0, -7.0/8.0, 1.0/8.0, 7.0/8.0},
-            {1.0/8.0, -1.0/8.0, 7.0/8.0, -7.0/8.0, -2.0/8.0, -6.0/8.0, -6.0/8.0, 14.0/8.0, 1.0/8.0, 7.0/8.0, -1.0/8.0, -7.0/8.0},
-            {-7.0/8.0, -1.0/8.0, 7.0/8.0, 1.0/8.0, -7.0/8.0, 7.0/8.0, -1.0/8.0, 1.0/8.0, 14.0/8.0, -6.0/8.0, -6.0/8.0, -2.0/8.0},
-            {7.0/8.0, 1.0/8.0, -7.0/8.0, -1.0/8.0, -1.0/8.0, 1.0/8.0, -7.0/8.0, 7.0/8.0, -6.0/8.0, 14.0/8.0, -2.0/8.0, -6.0/8.0},
-            {-1.0/8.0, -7.0/8.0, 1.0/8.0, 7.0/8.0, 7.0/8.0, -7.0/8.0, 1.0/8.0, -1.0/8.0, -6.0/8.0, -2.0/8.0, 14.0/8.0, -6.0/8.0},
-            {1.0/8.0, 7.0/8.0, -1.0/8.0, -7.0/8.0, 1.0/8.0, -1.0/8.0, 7.0/8.0, -7.0/8.0, -2.0/8.0, -6.0/8.0, -6.0/8.0, 14.0/8.0}}};
+            {{14.0 / 8.0, -6.0 / 8.0, -6.0 / 8.0, -2.0 / 8.0, -7.0 / 8.0, -1.0 / 8.0, 7.0 / 8.0, 1.0 / 8.0, -7.0 / 8.0, 7.0 / 8.0, -1.0 / 8.0, 1.0 / 8.0},
+             {-6.0 / 8.0, 14.0 / 8.0, -2.0 / 8.0, -6.0 / 8.0, 7.0 / 8.0, 1.0 / 8.0, -7.0 / 8.0, -1.0 / 8.0, -1.0 / 8.0, 1.0 / 8.0, -7.0 / 8.0, 7.0 / 8.0},
+             {-6.0 / 8.0, -2.0 / 8.0, 14.0 / 8.0, -6.0 / 8.0, -1.0 / 8.0, -7.0 / 8.0, 1.0 / 8.0, 7.0 / 8.0, 7.0 / 8.0, -7.0 / 8.0, 1.0 / 8.0, -1.0 / 8.0},
+             {-2.0 / 8.0, -6.0 / 8.0, -6.0 / 8.0, 14.0 / 8.0, 1.0 / 8.0, 7.0 / 8.0, -1.0 / 8.0, -7.0 / 8.0, 1.0 / 8.0, -1.0 / 8.0, 7.0 / 8.0, -7.0 / 8.0},
+             {-7.0 / 8.0, 7.0 / 8.0, -1.0 / 8.0, 1.0 / 8.0, 14.0 / 8.0, -6.0 / 8.0, -6.0 / 8.0, -2.0 / 8.0, -7.0 / 8.0, -1.0 / 8.0, 7.0 / 8.0, 1.0 / 8.0},
+             {-1.0 / 8.0, 1.0 / 8.0, -7.0 / 8.0, 7.0 / 8.0, -6.0 / 8.0, 14.0 / 8.0, -2.0 / 8.0, -6.0 / 8.0, 7.0 / 8.0, 1.0 / 8.0, -7.0 / 8.0, -1.0 / 8.0},
+             {7.0 / 8.0, -7.0 / 8.0, 1.0 / 8.0, -1.0 / 8.0, -6.0 / 8.0, -2.0 / 8.0, 14.0 / 8.0, -6.0 / 8.0, -1.0 / 8.0, -7.0 / 8.0, 1.0 / 8.0, 7.0 / 8.0},
+             {1.0 / 8.0, -1.0 / 8.0, 7.0 / 8.0, -7.0 / 8.0, -2.0 / 8.0, -6.0 / 8.0, -6.0 / 8.0, 14.0 / 8.0, 1.0 / 8.0, 7.0 / 8.0, -1.0 / 8.0, -7.0 / 8.0},
+             {-7.0 / 8.0, -1.0 / 8.0, 7.0 / 8.0, 1.0 / 8.0, -7.0 / 8.0, 7.0 / 8.0, -1.0 / 8.0, 1.0 / 8.0, 14.0 / 8.0, -6.0 / 8.0, -6.0 / 8.0, -2.0 / 8.0},
+             {7.0 / 8.0, 1.0 / 8.0, -7.0 / 8.0, -1.0 / 8.0, -1.0 / 8.0, 1.0 / 8.0, -7.0 / 8.0, 7.0 / 8.0, -6.0 / 8.0, 14.0 / 8.0, -2.0 / 8.0, -6.0 / 8.0},
+             {-1.0 / 8.0, -7.0 / 8.0, 1.0 / 8.0, 7.0 / 8.0, 7.0 / 8.0, -7.0 / 8.0, 1.0 / 8.0, -1.0 / 8.0, -6.0 / 8.0, -2.0 / 8.0, 14.0 / 8.0, -6.0 / 8.0},
+             {1.0 / 8.0, 7.0 / 8.0, -1.0 / 8.0, -7.0 / 8.0, 1.0 / 8.0, -1.0 / 8.0, 7.0 / 8.0, -7.0 / 8.0, -2.0 / 8.0, -6.0 / 8.0, -6.0 / 8.0, 14.0 / 8.0}}};
     }
     Eigen::MatrixXd Kmat_Eigen(12, 12);
     for (int i = 0; i < 12; ++i)
@@ -475,62 +468,56 @@ void FemSimulation::calculateElementStiffnessMatrix()
 #pragma acc data copyin(element_stiffness_matrix_)
 }
 
-
 void FemSimulation::setSource_x(const std::array<int, 3> &position)
 {
-    if (position[0] >= grid_size_x_*coord_x_ && position[0] <= grid_size_x_*(coord_x_+1) &&
-        position[1] >= grid_size_y_*coord_y_ && position[1] <= grid_size_y_*(coord_y_+1) &&
-        position[2] >= grid_size_z_*coord_z_ && position[2] <= grid_size_z_*(coord_z_+1))
+    if (position[0] >= grid_size_x_ * coord_x_ && position[0] <= grid_size_x_ * (coord_x_ + 1) &&
+        position[1] >= grid_size_y_ * coord_y_ && position[1] <= grid_size_y_ * (coord_y_ + 1) &&
+        position[2] >= grid_size_z_ * coord_z_ && position[2] <= grid_size_z_ * (coord_z_ + 1))
     {
-        source_position_x_.push_back(position[0] - grid_size_x_*coord_x_ + (position[1] - grid_size_y_*coord_y_) * grid_size_x_ +
-                                     (position[2] - grid_size_z_*coord_z_) * grid_size_x_ * grid_size_y_);
+        source_position_x_.push_back(position[0] - grid_size_x_ * coord_x_ + (position[1] - grid_size_y_ * coord_y_) * grid_size_x_ +
+                                     (position[2] - grid_size_z_ * coord_z_) * grid_size_x_ * grid_size_y_);
     }
 }
-
 
 void FemSimulation::setSource_y(const std::array<int, 3> &position)
 {
-    if (position[0] >= grid_size_x_*coord_x_ && position[0] <= grid_size_x_*(coord_x_+1) &&
-        position[1] >= grid_size_y_*coord_y_ && position[1] <= grid_size_y_*(coord_y_+1) &&
-        position[2] >= grid_size_z_*coord_z_ && position[2] <= grid_size_z_*(coord_z_+1))
+    if (position[0] >= grid_size_x_ * coord_x_ && position[0] <= grid_size_x_ * (coord_x_ + 1) &&
+        position[1] >= grid_size_y_ * coord_y_ && position[1] <= grid_size_y_ * (coord_y_ + 1) &&
+        position[2] >= grid_size_z_ * coord_z_ && position[2] <= grid_size_z_ * (coord_z_ + 1))
     {
-        source_position_y_.push_back(position[0] - grid_size_x_*coord_x_ + (position[1] - grid_size_y_*coord_y_) * grid_size_x_ +
-                                     (position[2] - grid_size_z_*coord_z_) * grid_size_x_ * grid_size_y_);
+        source_position_y_.push_back(position[0] - grid_size_x_ * coord_x_ + (position[1] - grid_size_y_ * coord_y_) * grid_size_x_ +
+                                     (position[2] - grid_size_z_ * coord_z_) * grid_size_x_ * grid_size_y_);
     }
 }
-
 
 void FemSimulation::setSource_z(const std::array<int, 3> &position)
 {
-    if (position[0] >= grid_size_x_*coord_x_ && position[0] <= grid_size_x_*(coord_x_+1) &&
-        position[1] >= grid_size_y_*coord_y_ && position[1] <= grid_size_y_*(coord_y_+1) &&
-        position[2] >= grid_size_z_*coord_z_ && position[2] <= grid_size_z_*(coord_z_+1))
+    if (position[0] >= grid_size_x_ * coord_x_ && position[0] <= grid_size_x_ * (coord_x_ + 1) &&
+        position[1] >= grid_size_y_ * coord_y_ && position[1] <= grid_size_y_ * (coord_y_ + 1) &&
+        position[2] >= grid_size_z_ * coord_z_ && position[2] <= grid_size_z_ * (coord_z_ + 1))
     {
-        source_position_z_.push_back(position[0] - grid_size_x_*coord_x_ + (position[1] - grid_size_y_*coord_y_) * grid_size_x_ +
-                                     (position[2] - grid_size_z_*coord_z_) * grid_size_x_ * grid_size_y_);
+        source_position_z_.push_back(position[0] - grid_size_x_ * coord_x_ + (position[1] - grid_size_y_ * coord_y_) * grid_size_x_ +
+                                     (position[2] - grid_size_z_ * coord_z_) * grid_size_x_ * grid_size_y_);
     }
 }
 
-
 void FemSimulation::setObservationPoint(const std::array<int, 3> &position)
 {
-    if (position[0] >= grid_size_x_*coord_x_ && position[0] <= grid_size_x_*(coord_x_+1) &&
-        position[1] >= grid_size_y_*coord_y_ && position[1] <= grid_size_y_*(coord_y_+1) &&
-        position[2] >= grid_size_z_*coord_z_ && position[2] <= grid_size_z_*(coord_z_+1))
+    if (position[0] >= grid_size_x_ * coord_x_ && position[0] <= grid_size_x_ * (coord_x_ + 1) &&
+        position[1] >= grid_size_y_ * coord_y_ && position[1] <= grid_size_y_ * (coord_y_ + 1) &&
+        position[2] >= grid_size_z_ * coord_z_ && position[2] <= grid_size_z_ * (coord_z_ + 1))
     {
-        observation_points_.push_back(position[0] - grid_size_x_*coord_x_ + (position[1] - grid_size_y_*coord_y_) * grid_size_x_ +
-                                    (position[2] - grid_size_z_*coord_z_) * grid_size_x_ * grid_size_y_);
+        observation_points_.push_back(position[0] - grid_size_x_ * coord_x_ + (position[1] - grid_size_y_ * coord_y_) * grid_size_x_ +
+                                      (position[2] - grid_size_z_ * coord_z_) * grid_size_x_ * grid_size_y_);
         saved_electric_field_.push_back(std::vector<std::array<double, 4>>());
     }
 }
 
-
-void FemSimulation::updateTimeStep(const double ci, const double di, const double deltat)
+void FemSimulation::updateTimeStep(const double deltat, const double offset)
 {
     int idx;
     double temp;
     int l, m, n;
-
 
     // 初期化
     // Uが0,Pが1,Pの更新に使うのが2
@@ -550,8 +537,29 @@ void FemSimulation::updateTimeStep(const double ci, const double di, const doubl
         ef_z_ptr_[i] = 0.0;
     }
 
+    // 2次精度シンプレクティック
 
-    // P(dE/dt)の更新
+    // U(E)の更新
+#pragma acc parallel loop
+    for (int i = 0; i < grid_size_x_ * (grid_size_y_ + 1) * (grid_size_z_ + 1); ++i)
+    {
+        ef_x_ptr_[ef_x_idx_0_ + i] +=
+            0.5 * deltat * ef_x_ptr_[ef_x_idx_1_ + i] / 8.0;
+    }
+#pragma acc parallel loop
+    for (int i = 0; i < (grid_size_x_ + 1) * grid_size_y_ * (grid_size_z_ + 1); ++i)
+    {
+        ef_y_ptr_[ef_y_idx_0_ + i] +=
+            0.5 * deltat * ef_y_ptr_[ef_y_idx_1_ + i] / 8.0;
+    }
+#pragma acc parallel loop
+    for (int i = 0; i < (grid_size_x_ + 1) * (grid_size_y_ + 1) * grid_size_z_; ++i)
+    {
+        ef_z_ptr_[ef_z_idx_0_ + i] +=
+            0.5 * deltat * ef_z_ptr_[ef_z_idx_1_ + i] / 8.0;
+    }
+
+    // P(M・dE/dt)の更新
     // 要素ごとの剛性行列の計算(外側要素のみ)
 #pragma acc parallel loop private(idx, ef_0_, temp, l, m, n)
     for (int i = 0; i < OE; ++i)
@@ -583,7 +591,7 @@ void FemSimulation::updateTimeStep(const double ci, const double di, const doubl
             }
             n = ef_x_idx_2_ + conn_x_ptr_[idx + l];
 #pragma acc atomic update
-            ef_x_ptr_[n] -= ci*time_step_*temp;
+            ef_x_ptr_[n] += temp;
         }
 
 #pragma acc loop seq
@@ -597,7 +605,7 @@ void FemSimulation::updateTimeStep(const double ci, const double di, const doubl
             }
             n = ef_y_idx_2_ + conn_y_ptr_[idx + l - 4];
 #pragma acc atomic update
-            ef_y_ptr_[n] -= ci*time_step_*temp;
+            ef_y_ptr_[n] += temp;
         }
 
 #pragma acc loop seq
@@ -611,17 +619,23 @@ void FemSimulation::updateTimeStep(const double ci, const double di, const doubl
             }
             n = ef_z_idx_2_ + conn_z_ptr_[idx + l - 8];
 #pragma acc atomic update
-            ef_z_ptr_[n] -= ci*time_step_*temp;
+            ef_z_ptr_[n] += temp;
         }
     }
 
+    // 外力項の計算
+#pragma acc parallel loop
+    for (size_t i = 0; i < source_position_z_.size(); ++i)
+    {
+        temp = source_function(current_time_ + offset + 0.5 * deltat, permeability_, domain_size_) * 8.0 / permittivity_ / domain_size_ / domain_size_ / domain_size_;
+        ef_z_ptr_[ef_z_idx_2_ + conn_z_ptr_[4 * src_pos_z_ptr_[i]]] += temp;
+    }
 
     // MPI通信
     start_communication_time_ = MPI_Wtime();
     startExchangeElectricField();
     end_communication_time_ = MPI_Wtime();
     total_communication_time_ += end_communication_time_ - start_communication_time_;
-
 
     // 要素ごとの剛性行列の計算(内側要素のみ)
 #pragma acc parallel loop private(idx, ef_0_, temp, l, m, n) collapse(3)
@@ -658,7 +672,7 @@ void FemSimulation::updateTimeStep(const double ci, const double di, const doubl
                     }
                     n = ef_x_idx_2_ + conn_x_ptr_[idx + l];
 #pragma acc atomic update
-                    ef_x_ptr_[n] -= ci*time_step_*temp;
+                    ef_x_ptr_[n] += temp;
                 }
 
 #pragma acc loop seq
@@ -672,7 +686,7 @@ void FemSimulation::updateTimeStep(const double ci, const double di, const doubl
                     }
                     n = ef_y_idx_2_ + conn_y_ptr_[idx + l - 4];
 #pragma acc atomic update
-                    ef_y_ptr_[n] -= ci*time_step_*temp;
+                    ef_y_ptr_[n] += temp;
                 }
 
 #pragma acc loop seq
@@ -686,12 +700,11 @@ void FemSimulation::updateTimeStep(const double ci, const double di, const doubl
                     }
                     n = ef_z_idx_2_ + conn_z_ptr_[idx + l - 8];
 #pragma acc atomic update
-                    ef_z_ptr_[n] -= ci*time_step_*temp;
+                    ef_z_ptr_[n] += temp;
                 }
             }
         }
     }
-
 
     // MPI通信完了待ち
     start_communication_time_ = MPI_Wtime();
@@ -699,41 +712,32 @@ void FemSimulation::updateTimeStep(const double ci, const double di, const doubl
     end_communication_time_ = MPI_Wtime();
     total_communication_time_ += end_communication_time_ - start_communication_time_;
 
-
-    // 外力項の計算
-#pragma acc parallel loop
-    for (size_t i = 0; i < source_position_z_.size(); ++i)
-    {
-        temp = source_function(current_time_ + deltat * time_step_, permeability_, domain_size_) * 8.0 / permittivity_
-         / domain_size_ / domain_size_ / domain_size_;
-        ef_z_ptr_[ef_z_idx_1_ + conn_z_ptr_[4*src_pos_z_ptr_[i]]] -= ci*time_step_*temp;
-    }
-
-
     // U(E)の更新(Pの更新も兼ねる)
 #pragma acc parallel loop
     for (int i = 0; i < grid_size_x_ * (grid_size_y_ + 1) * (grid_size_z_ + 1); ++i)
     {
-        ef_x_ptr_[ef_x_idx_1_ + i] += ef_x_ptr_[ef_x_idx_2_ + i];
+        ef_x_ptr_[ef_x_idx_1_ + i] -= deltat * ef_x_ptr_[ef_x_idx_2_ + i];
         ef_x_ptr_[ef_x_idx_0_ + i] +=
-            di * time_step_ * ef_x_ptr_[ef_x_idx_1_ + i] / 8.0;
+            0.5 * deltat * ef_x_ptr_[ef_x_idx_1_ + i] / 8.0;
     }
 #pragma acc parallel loop
     for (int i = 0; i < (grid_size_x_ + 1) * grid_size_y_ * (grid_size_z_ + 1); ++i)
     {
-        ef_y_ptr_[ef_y_idx_1_ + i] += ef_y_ptr_[ef_y_idx_2_ + i];
+        ef_y_ptr_[ef_y_idx_1_ + i] -= deltat * ef_y_ptr_[ef_y_idx_2_ + i];
         ef_y_ptr_[ef_y_idx_0_ + i] +=
-            di * time_step_ * ef_y_ptr_[ef_y_idx_1_ + i] / 8.0;
+            0.5 * deltat * ef_y_ptr_[ef_y_idx_1_ + i] / 8.0;
     }
 #pragma acc parallel loop
     for (int i = 0; i < (grid_size_x_ + 1) * (grid_size_y_ + 1) * grid_size_z_; ++i)
     {
-        ef_z_ptr_[ef_z_idx_1_ + i] += ef_z_ptr_[ef_z_idx_2_ + i];
+        ef_z_ptr_[ef_z_idx_1_ + i] -= deltat * ef_z_ptr_[ef_z_idx_2_ + i];
         ef_z_ptr_[ef_z_idx_0_ + i] +=
-            di * time_step_ * ef_z_ptr_[ef_z_idx_1_ + i] / 8.0;
+            0.5 * deltat * ef_z_ptr_[ef_z_idx_1_ + i] / 8.0;
     }
-}
 
+    // 境界条件
+    applyBoundaryConditions();
+}
 
 void FemSimulation::startExchangeElectricField()
 {
@@ -757,12 +761,12 @@ void FemSimulation::startExchangeElectricField()
         if (coord_x_ != 0)
         {
             MPI_Iallreduce(send_buf_x_plane_0_y_ptr_, recv_buf_x_plane_0_y_ptr_,
-                        BNx0y, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[0]);
+                           BNx0y, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[0]);
         }
         if (coord_x_ != dim_x_ - 1)
         {
             MPI_Iallreduce(send_buf_x_plane_1_y_ptr_, recv_buf_x_plane_1_y_ptr_,
-                        BNx1y, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[1]);
+                           BNx1y, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[1]);
         }
     }
 #pragma acc parallel loop collapse(2)
@@ -781,15 +785,14 @@ void FemSimulation::startExchangeElectricField()
         if (coord_x_ != 0)
         {
             MPI_Iallreduce(send_buf_x_plane_0_z_ptr_, recv_buf_x_plane_0_z_ptr_,
-                        BNx0z, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[2]);
+                           BNx0z, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[2]);
         }
         if (coord_x_ != dim_x_ - 1)
         {
             MPI_Iallreduce(send_buf_x_plane_1_z_ptr_, recv_buf_x_plane_1_z_ptr_,
-                        BNx1z, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[3]);
+                           BNx1z, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[3]);
         }
     }
-
 
     comm_0_ = coord_y_ % 2 == 0 ? comm_y_plane_0_ : comm_y_plane_1_;
     comm_1_ = coord_y_ % 2 == 0 ? comm_y_plane_1_ : comm_y_plane_0_;
@@ -809,12 +812,12 @@ void FemSimulation::startExchangeElectricField()
         if (coord_y_ != 0)
         {
             MPI_Iallreduce(send_buf_y_plane_0_z_ptr_, recv_buf_y_plane_0_z_ptr_,
-                        BNy0z, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[4]);
+                           BNy0z, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[4]);
         }
         if (coord_y_ != dim_y_ - 1)
         {
             MPI_Iallreduce(send_buf_y_plane_1_z_ptr_, recv_buf_y_plane_1_z_ptr_,
-                        BNy1z, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[5]);
+                           BNy1z, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[5]);
         }
     }
 #pragma acc parallel loop collapse(2)
@@ -833,15 +836,14 @@ void FemSimulation::startExchangeElectricField()
         if (coord_y_ != 0)
         {
             MPI_Iallreduce(send_buf_y_plane_0_x_ptr_, recv_buf_y_plane_0_x_ptr_,
-                        BNy0x, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[6]);
+                           BNy0x, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[6]);
         }
         if (coord_y_ != dim_y_ - 1)
         {
             MPI_Iallreduce(send_buf_y_plane_1_x_ptr_, recv_buf_y_plane_1_x_ptr_,
-                        BNy1x, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[7]);
+                           BNy1x, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[7]);
         }
     }
-
 
     comm_0_ = coord_z_ % 2 == 0 ? comm_z_plane_0_ : comm_z_plane_1_;
     comm_1_ = coord_z_ % 2 == 0 ? comm_z_plane_1_ : comm_z_plane_0_;
@@ -861,12 +863,12 @@ void FemSimulation::startExchangeElectricField()
         if (coord_z_ != 0)
         {
             MPI_Iallreduce(send_buf_z_plane_0_x_ptr_, recv_buf_z_plane_0_x_ptr_,
-                          BNz0x, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[8]);
+                           BNz0x, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[8]);
         }
         if (coord_z_ != dim_z_ - 1)
         {
             MPI_Iallreduce(send_buf_z_plane_1_x_ptr_, recv_buf_z_plane_1_x_ptr_,
-                          BNz1x, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[9]);
+                           BNz1x, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[9]);
         }
     }
 #pragma acc parallel loop collapse(2)
@@ -885,15 +887,14 @@ void FemSimulation::startExchangeElectricField()
         if (coord_z_ != 0)
         {
             MPI_Iallreduce(send_buf_z_plane_0_y_ptr_, recv_buf_z_plane_0_y_ptr_,
-                          BNz0y, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[10]);
+                           BNz0y, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[10]);
         }
         if (coord_z_ != dim_z_ - 1)
         {
             MPI_Iallreduce(send_buf_z_plane_1_y_ptr_, recv_buf_z_plane_1_y_ptr_,
-                          BNz1y, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[11]);
+                           BNz1y, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[11]);
         }
     }
-
 
     if (coord_y_ % 2 == 0 && coord_z_ % 2 == 0)
     {
@@ -940,25 +941,24 @@ void FemSimulation::startExchangeElectricField()
         if (coord_y_ != 0 && coord_z_ != 0)
         {
             MPI_Iallreduce(send_buf_x_line_0_ptr_, recv_buf_x_line_0_ptr_,
-                          BLx0, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[12]);
+                           BLx0, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[12]);
         }
         if (coord_y_ != dim_y_ - 1 && coord_z_ != 0)
         {
             MPI_Iallreduce(send_buf_x_line_1_ptr_, recv_buf_x_line_1_ptr_,
-                          BLx1, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[13]);
+                           BLx1, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[13]);
         }
         if (coord_y_ != 0 && coord_z_ != dim_z_ - 1)
         {
             MPI_Iallreduce(send_buf_x_line_2_ptr_, recv_buf_x_line_2_ptr_,
-                          BLx2, MPI_DOUBLE, MPI_SUM, comm_2_, &reqs_[14]);
+                           BLx2, MPI_DOUBLE, MPI_SUM, comm_2_, &reqs_[14]);
         }
         if (coord_y_ != dim_y_ - 1 && coord_z_ != dim_z_ - 1)
         {
             MPI_Iallreduce(send_buf_x_line_3_ptr_, recv_buf_x_line_3_ptr_,
-                          BLx3, MPI_DOUBLE, MPI_SUM, comm_3_, &reqs_[15]);
+                           BLx3, MPI_DOUBLE, MPI_SUM, comm_3_, &reqs_[15]);
         }
     }
-
 
     if (coord_z_ % 2 == 0 && coord_x_ % 2 == 0)
     {
@@ -1005,25 +1005,24 @@ void FemSimulation::startExchangeElectricField()
         if (coord_z_ != 0 && coord_x_ != 0)
         {
             MPI_Iallreduce(send_buf_y_line_0_ptr_, recv_buf_y_line_0_ptr_,
-                          BLy0, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[16]);
+                           BLy0, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[16]);
         }
         if (coord_z_ != dim_z_ - 1 && coord_x_ != 0)
         {
             MPI_Iallreduce(send_buf_y_line_1_ptr_, recv_buf_y_line_1_ptr_,
-                          BLy1, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[17]);
+                           BLy1, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[17]);
         }
         if (coord_z_ != 0 && coord_x_ != dim_x_ - 1)
         {
             MPI_Iallreduce(send_buf_y_line_2_ptr_, recv_buf_y_line_2_ptr_,
-                          BLy2, MPI_DOUBLE, MPI_SUM, comm_2_, &reqs_[18]);
+                           BLy2, MPI_DOUBLE, MPI_SUM, comm_2_, &reqs_[18]);
         }
         if (coord_z_ != dim_z_ - 1 && coord_x_ != dim_x_ - 1)
         {
             MPI_Iallreduce(send_buf_y_line_3_ptr_, recv_buf_y_line_3_ptr_,
-                          BLy3, MPI_DOUBLE, MPI_SUM, comm_3_, &reqs_[19]);
+                           BLy3, MPI_DOUBLE, MPI_SUM, comm_3_, &reqs_[19]);
         }
     }
-
 
     if (coord_x_ % 2 == 0 && coord_y_ % 2 == 0)
     {
@@ -1070,26 +1069,25 @@ void FemSimulation::startExchangeElectricField()
         if (coord_x_ != 0 && coord_y_ != 0)
         {
             MPI_Iallreduce(send_buf_z_line_0_ptr_, recv_buf_z_line_0_ptr_,
-                          BLz0, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[20]);
+                           BLz0, MPI_DOUBLE, MPI_SUM, comm_0_, &reqs_[20]);
         }
         if (coord_x_ != dim_x_ - 1 && coord_y_ != 0)
         {
             MPI_Iallreduce(send_buf_z_line_1_ptr_, recv_buf_z_line_1_ptr_,
-                          BLz1, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[21]);
+                           BLz1, MPI_DOUBLE, MPI_SUM, comm_1_, &reqs_[21]);
         }
         if (coord_x_ != 0 && coord_y_ != dim_y_ - 1)
         {
             MPI_Iallreduce(send_buf_z_line_2_ptr_, recv_buf_z_line_2_ptr_,
-                          BLz2, MPI_DOUBLE, MPI_SUM, comm_2_, &reqs_[22]);
+                           BLz2, MPI_DOUBLE, MPI_SUM, comm_2_, &reqs_[22]);
         }
         if (coord_x_ != dim_x_ - 1 && coord_y_ != dim_y_ - 1)
         {
             MPI_Iallreduce(send_buf_z_line_3_ptr_, recv_buf_z_line_3_ptr_,
-                          BLz3, MPI_DOUBLE, MPI_SUM, comm_3_, &reqs_[23]);
+                           BLz3, MPI_DOUBLE, MPI_SUM, comm_3_, &reqs_[23]);
         }
     }
 }
-
 
 void FemSimulation::finishExchangeElectricField()
 {
@@ -1198,7 +1196,6 @@ void FemSimulation::finishExchangeElectricField()
             recv_buf_z_line_3_ptr_[i];
     }
 }
-
 
 void FemSimulation::applyBoundaryConditions()
 {
@@ -1346,28 +1343,13 @@ void FemSimulation::applyBoundaryConditions()
     }
 }
 
-
 void FemSimulation::run(int num_steps)
 {
-    double x = (std::pow(2.0, 1.0/3.0) + std::pow(2.0, -1.0/3.0) - 1.0) / 6.0;
-    double c1 = 0.0;
-    double c2 = 2.0*x + 1.0;
-    double c3 = -4.0*x - 1.0;
-    double c4 = 2.0*x + 1.0;
-    double d1 = x + 0.5;
-    double d2 = -x;
-    double d3 = -x;
-    double d4 = x + 0.5;
-    std::cout << "x: " << x << std::endl;
-    std::cout << "c1: " << c1 << std::endl;
-    std::cout << "c2: " << c2 << std::endl;
-    std::cout << "c3: " << c3 << std::endl;
-    std::cout << "c4: " << c4 << std::endl;
-    std::cout << "d1: " << d1 << std::endl;
-    std::cout << "d2: " << d2 << std::endl;
-    std::cout << "d3: " << d3 << std::endl;
-    std::cout << "d4: " << d4 << std::endl;
+    double x1 = 1.0 / (2.0 - std::pow(2.0, 1.0 / 3.0));
+    double x2 = 1.0 - 2.0 * x1;
 
+    std::cout << "x1: " << x1 << std::endl;
+    std::cout << "x2: " << x2 << std::endl;
 
     saved_electric_field_.resize(observation_points_.size());
     for (auto &point : saved_electric_field_)
@@ -1393,15 +1375,15 @@ void FemSimulation::run(int num_steps)
         {
             for (size_t i = 0; i < observation_points_.size(); ++i)
             {
-                int conn_x_0 = conn_x_ptr_[4*observation_points_[i]];
-                int conn_x_1 = conn_x_ptr_[4*observation_points_[i] + 2];
-                int conn_x_2 = conn_x_ptr_[4*observation_points_[i] - 4];
-                int conn_x_3 = conn_x_ptr_[4*observation_points_[i] - 4 + 2];
-                int conn_y_0 = conn_y_ptr_[4*observation_points_[i]];
-                int conn_y_1 = conn_y_ptr_[4*observation_points_[i] + 1];
-                int conn_y_2 = conn_y_ptr_[4*observation_points_[i] - 4*grid_size_x_];
-                int conn_y_3 = conn_y_ptr_[4*observation_points_[i] - 4*grid_size_x_ + 1];
-                int conn_z_0 = conn_z_ptr_[4*observation_points_[i]];
+                int conn_x_0 = conn_x_ptr_[4 * observation_points_[i]];
+                int conn_x_1 = conn_x_ptr_[4 * observation_points_[i] + 2];
+                int conn_x_2 = conn_x_ptr_[4 * observation_points_[i] - 4];
+                int conn_x_3 = conn_x_ptr_[4 * observation_points_[i] - 4 + 2];
+                int conn_y_0 = conn_y_ptr_[4 * observation_points_[i]];
+                int conn_y_1 = conn_y_ptr_[4 * observation_points_[i] + 1];
+                int conn_y_2 = conn_y_ptr_[4 * observation_points_[i] - 4 * grid_size_x_];
+                int conn_y_3 = conn_y_ptr_[4 * observation_points_[i] - 4 * grid_size_x_ + 1];
+                int conn_z_0 = conn_z_ptr_[4 * observation_points_[i]];
 #pragma acc update host(ef_x_ptr_[ef_x_idx_0_ + conn_x_0])
 #pragma acc update host(ef_x_ptr_[ef_x_idx_0_ + conn_x_1])
 #pragma acc update host(ef_x_ptr_[ef_x_idx_0_ + conn_x_2])
@@ -1430,22 +1412,16 @@ void FemSimulation::run(int num_steps)
             }
         }
 
-        // 4次シンプレクティックで更新
-        updateTimeStep(c1,d1,0.0);
-        applyBoundaryConditions();
-        updateTimeStep(c2,d2,d1);
-        applyBoundaryConditions();
-        updateTimeStep(c3,d3,d1+d2);
-        applyBoundaryConditions();
-        updateTimeStep(c4,d4,d1+d2+d3);
-        applyBoundaryConditions();
+        // シンプレクティックで更新(4次)
+        updateTimeStep(x1 * time_step_, 0.0);
+        updateTimeStep(x2 * time_step_, x1 * time_step_);
+        updateTimeStep(x1 * time_step_, (x1 + x2) * time_step_);
 
         // 時間を進める
         current_time_ += time_step_;
     }
     std::cout << "rank: " << rank_ << " Total communication time: " << total_communication_time_ << " seconds" << std::endl;
 }
-
 
 void FemSimulation::saveResults(int num_steps, const std::string &filename)
 {
@@ -1470,7 +1446,6 @@ void FemSimulation::saveResults(int num_steps, const std::string &filename)
         std::cout << "rank: " << rank_ << " Results saved to " << filename << std::endl;
     }
 }
-
 
 bool check_params(const std::array<double, 3> &domain_sizes, const std::array<int, 3> &grid_num, double duration,
                   double time_step, double domain_size, double c)
@@ -1507,31 +1482,33 @@ bool check_params(const std::array<double, 3> &domain_sizes, const std::array<in
     return true;
 };
 
-
 std::string compress(double value)
 {
     std::ostringstream oss;
     oss << std::scientific << std::setprecision(6) << value;
     std::string str = oss.str();
-    
+
     // 'e' または 'E' の位置を探す
     size_t e_pos = str.find_first_of("eE");
-    if (e_pos == std::string::npos) {
-        return str;  // e表記でない場合はそのまま
+    if (e_pos == std::string::npos)
+    {
+        return str; // e表記でない場合はそのまま
     }
-    
+
     // 仮数部と指数部に分割
     std::string mantissa = str.substr(0, e_pos);
-    std::string exponent = str.substr(e_pos);  // "e+00" だけは除く
-    if (exponent == "e+00" || exponent == "E+00") {
+    std::string exponent = str.substr(e_pos); // "e+00" だけは除く
+    if (exponent == "e+00" || exponent == "E+00")
+    {
         exponent = "";
     }
-    
+
     // 仮数部の末尾のゼロを削除
     mantissa.erase(mantissa.find_last_not_of('0') + 1, std::string::npos);
-    if (mantissa.back() == '.') {
+    if (mantissa.back() == '.')
+    {
         mantissa.pop_back();
     }
-    
+
     return mantissa + exponent;
 }
