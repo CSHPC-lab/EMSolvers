@@ -1,6 +1,10 @@
 ## 実行
 ```bash
-source venv/bin/activate
+conda create -n visualize python=3.11
+
+conda activate visualize
+
 pip install -r requirements.txt
-python visualize.py --compare
+
+python visualize.py
 ```
