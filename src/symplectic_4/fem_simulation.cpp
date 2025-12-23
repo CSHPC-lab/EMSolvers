@@ -1369,6 +1369,9 @@ void FemSimulation::saveResults(int num_steps, const std::string &filename)
             return;
         }
 
+        // 精度を設定
+        file << std::setprecision(15) << std::scientific;
+
         // 結果をCSV形式で保存
         file << "time,Ex,Ey,Ez" << std::endl;
         for (size_t j = 0; j < saved_electric_field_[i].size(); ++j)
