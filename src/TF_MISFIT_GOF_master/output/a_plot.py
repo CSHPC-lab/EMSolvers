@@ -27,7 +27,15 @@ for col in columns:
         y = df[col].astype(float).values
         n = np.arange(1, len(y) + 1)
         x = dx / n
-        plt.loglog(x, y, marker='o', label=prefix)  # 両対数プロット
+
+        # 収束次数を計算（最初と最後の点を使用）
+        x1, y1 = x[0], y[0]  # 最初の点
+        x2, y2 = x[-1], y[-1]  # 最後の点
+        order = (np.log(y2) - np.log(y1)) / (np.log(x2) - np.log(x1))
+
+        plt.loglog(x, y, marker="o", label=f"{prefix} (order: {order:.2f})")
+        print(f"  {prefix}: {order:.4f}")
+
     plt.xlabel("Δx (log scale)")
     plt.ylabel(col + " (log scale)")
     plt.grid(True, which="both", ls="--", linewidth=0.5)
