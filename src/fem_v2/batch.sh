@@ -1,10 +1,10 @@
 #!/bin/bash -l
 
-#SBATCH --array=1,2%1
+#SBATCH --array=2,4%1
 #SBATCH --cpus-per-task=12
-#SBATCH --gres=gpu:1
-#SBATCH --ntasks-per-node=1
-#SBATCH --nodes=1
+#SBATCH --gres=gpu:4
+#SBATCH --ntasks-per-node=4
+#SBATCH --nodes=4
 #SBATCH --partition=all
 #SBATCH --time=1:00:00
 #SBATCH -o ./log/slurm.%j.out
@@ -15,7 +15,7 @@ module load nvhpc
 processes=$(($SLURM_NTASKS_PER_NODE * $SLURM_JOB_NUM_NODES))
 n=$(( ( SLURM_ARRAY_TASK_ID + 1 ) / 2 ))
 use_ofem=$(( ( SLURM_ARRAY_TASK_ID - 1 ) % 2 ))
-order=1
+order=3
 domain_size="3.0"
 base_num=300
 duration="9.0e-9"

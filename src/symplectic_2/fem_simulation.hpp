@@ -11,7 +11,7 @@ class FemSimulation
 {
 public:
     // コンストラクタ
-    FemSimulation(const std::array<int, 3> &grid_size, double domain_size, double time_step,
+    FemSimulation(int order, const std::array<int, 3> &grid_size, double domain_size, double time_step,
                   double permittivity, double permeability, int time_frequency,
                   int use_ofem, const std::array<int, 3> &dims, const std::array<int, 3> &coords, int rank,
                   MPI_Comm comm_x_plane_0, MPI_Comm comm_x_plane_1, MPI_Comm comm_y_plane_0, MPI_Comm comm_y_plane_1, MPI_Comm comm_z_plane_0, MPI_Comm comm_z_plane_1,
@@ -37,6 +37,8 @@ public:
     // 結果の保存
     void saveResults(int num_steps, const std::string &filename);
 
+    ~FemSimulation();
+
 private:
     // メッシュの初期化
     void initializeMesh();
@@ -48,6 +50,7 @@ private:
     void applyBoundaryConditions();
 
     // メンバ変数
+    int order_;
     int grid_size_x_;
     int grid_size_y_;
     int grid_size_z_;
@@ -173,7 +176,7 @@ private:
     std::vector<int> source_position_z_;
 
     // 観測点のリスト
-    std::vector<int> observation_points_;
+    std::vector<std::array<int, 3>> observation_points_;
 
     // 時間
     double current_time_;
@@ -190,7 +193,8 @@ private:
     int ef_z_idx_2_ = 2 * (grid_size_x_ + 1) * (grid_size_y_ + 1) * grid_size_z_;
 
     // 要素剛性行列
-    std::array<std::array<double, 12>, 12> element_stiffness_matrix_;
+    std::vector<double> element_stiffness_matrix_;
+    int mat_size_; // = order_ * (order_ + 1) * (order_ + 1) * 3
 
     // 要素剛性行列の計算
     void calculateElementStiffnessMatrix();
@@ -222,3 +226,7 @@ bool check_params(const std::array<double, 3> &domain_sizes, const std::array<in
 double source_function(double t);
 
 std::string compress(double value);
+
+double parseValue(const std::string &str);
+
+std::vector<std::vector<double>> loadMatrixFromCSV(const std::string &filename);

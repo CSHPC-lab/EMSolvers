@@ -103,13 +103,13 @@ int main(int argc, char *argv[])
     num_time_step = static_cast<int>(std::floor(duration / time_step) + 1);
     if (use_ofem)
     {
-        filename = "ofem2" + std::to_string(order) + "_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
+        filename = "ofem" + std::to_string(order) + "_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
                    "_" + compress(source_position_x) + "_" + compress(source_position_y) + "_" + compress(source_position_z) +
                    "_" + compress(observation_position_x) + "_" + compress(observation_position_y) + "_" + compress(observation_position_z) + ".csv";
     }
     else
     {
-        filename = "fem2" + std::to_string(order) + "_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
+        filename = "fem" + std::to_string(order) + "_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
                    "_" + compress(source_position_x) + "_" + compress(source_position_y) + "_" + compress(source_position_z) +
                    "_" + compress(observation_position_x) + "_" + compress(observation_position_y) + "_" + compress(observation_position_z) + ".csv";
     }
