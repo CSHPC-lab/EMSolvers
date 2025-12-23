@@ -14,6 +14,7 @@ int main(int argc, char *argv[])
     int rank;
     int scale;
     int use_ofem;
+    int order;
     double domain_size_x, domain_size_y, domain_size_z;
     int base_num;
     double duration;
@@ -47,11 +48,12 @@ int main(int argc, char *argv[])
         size_z_line_0, size_z_line_1, size_z_line_2, size_z_line_3;
     int gpu_id, num_gpus;
 
-    if (argc != 17)
+    if (argc != 18)
     {
-        std::cout << "Usage: mpirun -n <size> ./fem_simulation <scale> <use_ofem> <domain_size_x> <domain_size_y> <domain_size_z> <base_num> <duration> <source_position_x> <source_position_y> <source_position_z> <observation_position_x> <observation_position_y> <observation_position_z> <dim_x> <dim_y> <dim_z>" << std::endl;
+        std::cout << "Usage: mpirun -n <size> ./fem_simulation <scale> <use_ofem> <order> <domain_size_x> <domain_size_y> <domain_size_z> <base_num> <duration> <source_position_x> <source_position_y> <source_position_z> <observation_position_x> <observation_position_y> <observation_position_z> <dim_x> <dim_y> <dim_z>" << std::endl;
         std::cout << "  scale: Grid size multiplier (e.g., 1 for 100x100x100)" << std::endl;
         std::cout << "  use_ofem: Use OFEM (1) or standard FEM (0)" << std::endl;
+        std::cout << "  order: element order" << std::endl;
         std::cout << "  domain_size_x, domain_size_y, domain_size_z: Size of the domain in each dimension" << std::endl;
         std::cout << "  base_num: Base grid number" << std::endl;
         std::cout << "  duration: Simulation duration" << std::endl;
@@ -67,20 +69,21 @@ int main(int argc, char *argv[])
     // シミュレーションパラメータの設定
     scale = std::stoi(argv[1]);
     use_ofem = std::stoi(argv[2]);
-    domain_size_x = std::stod(argv[3]);
-    domain_size_y = std::stod(argv[4]);
-    domain_size_z = std::stod(argv[5]);
-    base_num = std::stoi(argv[6]);
-    duration = std::stod(argv[7]);
-    source_position_x = std::stod(argv[8]);
-    source_position_y = std::stod(argv[9]);
-    source_position_z = std::stod(argv[10]);
-    observation_position_x = std::stod(argv[11]);
-    observation_position_y = std::stod(argv[12]);
-    observation_position_z = std::stod(argv[13]);
-    dim_x = std::stoi(argv[14]);
-    dim_y = std::stoi(argv[15]);
-    dim_z = std::stoi(argv[16]);
+    order = std::stoi(argv[3]);
+    domain_size_x = std::stod(argv[4]);
+    domain_size_y = std::stod(argv[5]);
+    domain_size_z = std::stod(argv[6]);
+    base_num = std::stoi(argv[7]);
+    duration = std::stod(argv[8]);
+    source_position_x = std::stod(argv[9]);
+    source_position_y = std::stod(argv[10]);
+    source_position_z = std::stod(argv[11]);
+    observation_position_x = std::stod(argv[12]);
+    observation_position_y = std::stod(argv[13]);
+    observation_position_z = std::stod(argv[14]);
+    dim_x = std::stoi(argv[15]);
+    dim_y = std::stoi(argv[16]);
+    dim_z = std::stoi(argv[17]);
 
     domain_sizes[0] = domain_size_x;
     domain_sizes[1] = domain_size_y;
@@ -100,13 +103,13 @@ int main(int argc, char *argv[])
     num_time_step = static_cast<int>(std::floor(duration / time_step) + 1);
     if (use_ofem)
     {
-        filename = "symplectic4thofem_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
+        filename = "symplectic4thofem" + std::to_string(order) + "_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
                    "_" + compress(source_position_x) + "_" + compress(source_position_y) + "_" + compress(source_position_z) +
                    "_" + compress(observation_position_x) + "_" + compress(observation_position_y) + "_" + compress(observation_position_z) + ".csv";
     }
     else
     {
-        filename = "symplectic4thfem_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
+        filename = "symplectic4thfem" + std::to_string(order) + "_" + std::to_string(scale) + "_" + compress(domain_size_x) + "_" + compress(domain_size_y) + "_" + compress(domain_size_z) + "_" + compress(duration) +
                    "_" + compress(source_position_x) + "_" + compress(source_position_y) + "_" + compress(source_position_z) +
                    "_" + compress(observation_position_x) + "_" + compress(observation_position_y) + "_" + compress(observation_position_z) + ".csv";
     }
@@ -209,7 +212,7 @@ int main(int argc, char *argv[])
 
     // シミュレーション
     start_time = omp_get_wtime();
-    FemSimulation simulation(grid_nums, domain_size, time_step, permittivity, permeability,
+    FemSimulation simulation(order, grid_nums, domain_size, time_step, permittivity, permeability,
                              time_frequency, use_ofem, dims, coords, rank,
                              comm_x_plane_0, comm_x_plane_1, comm_y_plane_0, comm_y_plane_1, comm_z_plane_0, comm_z_plane_1,
                              comm_x_line_0, comm_x_line_1, comm_x_line_2, comm_x_line_3,
