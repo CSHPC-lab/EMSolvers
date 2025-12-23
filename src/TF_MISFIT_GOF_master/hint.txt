@@ -1,0 +1,4 @@
+答えのファイルをルートに置き、対象のファイルをtarget/におく
+
+conda activate tfmisfit
+sbatch job.sh

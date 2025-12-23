@@ -1,0 +1,11 @@
+&INPUT
+  MT=201,
+  DT=0.05,
+  FMIN=0.05,
+  FMAX=2.0,
+  S1_NAME='answer.dat',
+  S2_NAME='answer1_4.dat',
+  NC=1,
+  IS_S2_REFERENCE=T,
+  LOCAL_NORM=F
+/

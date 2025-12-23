@@ -71,5 +71,7 @@ compile_commands.json
 **/*.png
 **/*.err
 results/
+**/TF_MISFIT_GOF*/*
 
 !**/kmat/*
+!**/TF_MISFIT_GOF_master/*
