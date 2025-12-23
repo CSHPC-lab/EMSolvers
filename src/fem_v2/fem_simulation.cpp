@@ -486,7 +486,7 @@ void FemSimulation::calculateElementStiffnessMatrix()
     }
 
     element_stiffness_matrix_ptr_ = element_stiffness_matrix_.data();
-#pragma acc data copyin(element_stiffness_matrix_)
+#pragma acc data copyin(element_stiffness_matrix_ptr_[0 : mat_size_ * mat_size_])
 }
 
 void FemSimulation::setSource_x(const std::array<int, 3> &position)
